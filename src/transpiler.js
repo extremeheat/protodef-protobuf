@@ -11,9 +11,9 @@ const PROTO_TO_PROTODEF_TYPE_MAP = {
   // VarInt
   int32: 'varint',
   uint32: 'varint',
-  int64: 'varint',
+  int64: 'varint', // Note: JavaScript's number safety limits may apply.
   uint64: 'varint',
-  bool: 'bool',
+  bool: 'bool', // bool is encoded as a varint(0 or 1), but protodef handles this mapping.
   enum: 'varint',
 
   // ZigZag VarInt
@@ -82,12 +82,15 @@ function processNode (node, prefix, schema) {
   if (node.enums) {
     for (const anEnum of node.enums) {
       const protodefTypeName = `${prefix}${anEnum.name}`
-      const values = {}
-      for (const value of anEnum.values) {
-        values[value.name] = value.value
+      // FIX: Use the 'mapper' type instead of 'enum'.
+      // The mappings object needs to have the numeric value as the key.
+      const mappings = {}
+      for (const key in anEnum.values) {
+        const numericValue = anEnum.values[key].value
+        mappings[numericValue] = key
       }
-      // Protobuf enums are encoded as varints.
-      schema[protodefTypeName] = ['enum', { type: 'varint', values }]
+      // Protobuf enums are encoded as varints, so the underlying type is 'varint'.
+      schema[protodefTypeName] = ['mapper', { type: 'varint', mappings }]
     }
   }
 }

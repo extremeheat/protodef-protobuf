@@ -8,9 +8,8 @@
  */
 
 const schemaParser = require('protocol-buffers-schema')
-const { ProtoDef } = require('protodef')
+const { ProtoDef, Compiler: { ProtoDefCompiler } } = require('protodef')
 const { transpileProtobufAST } = require('./transpiler.js')
-const customTypes = require('./datatypes.js')
 
 // A more complex .proto schema with nested types, enums, and packages.
 const protoFileContent = `
@@ -38,20 +37,32 @@ const protoFileContent = `
 `
 
 // The main test execution
-async function runTest () {
+async function runTest (useCompiler = true) {
   console.log('--- Step 1: Parsing .proto file content ---')
   const ast = schemaParser.parse(protoFileContent)
   console.log('AST generated successfully.', JSON.stringify(ast))
 
   console.log('\n--- Step 2: Transpiling AST to protodef schema ---')
   const generatedSchema = transpileProtobufAST(ast)
+  generatedSchema.protobuf_container = 'native'
   console.log('Protodef schema generated:')
   console.log(JSON.stringify(generatedSchema, null, 2))
 
   console.log('\n--- Step 3: Setting up ProtoDef instance ---')
-  const proto = new ProtoDef()
-  proto.addTypes(customTypes) // Add our custom 'protobuf_container'
-  proto.addTypes(generatedSchema) // Add the types we just generated
+  console.log('Adding Types')
+
+  let proto
+  // Add our custom 'protobuf_container'
+  if (useCompiler) {
+    const compiler = new ProtoDefCompiler()
+    compiler.addTypes(require('./datatypes_compiler.js'))
+    compiler.addTypesToCompile(generatedSchema) // Add the types we just generated
+    proto = compiler.compileProtoDefSync()
+  } else {
+    proto = new ProtoDef()
+    proto.addTypes(require('./datatypes.js')) // Add our custom datatypes
+    proto.addTypes(generatedSchema) // Add the types we just generated
+  }
   console.log('ProtoDef instance created and types added.')
 
   console.log('\n--- Step 4: Attempting to serialize/deserialize ---')
@@ -80,7 +91,8 @@ async function runTest () {
     console.log('Packet parsed successfully (result will be dummy data).')
     console.log('Parsed Data:', JSON.stringify(result.data, null, 2))
   } catch (e) {
-    console.error('\nAn error occurred during serialization/deserialization:', e.message)
+    console.error('\nAn error occurred during serialization/deserialization:')
+    console.log(e)
   }
 
   console.log('\n--- Test Complete ---')
