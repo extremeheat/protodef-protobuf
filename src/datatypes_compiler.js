@@ -29,48 +29,44 @@ function getWireType (compiler, type) {
 function generateSizeOf (compiler, fields) {
   let code = 'let size = 0;\n'
   for (const field of fields) {
-    const wireType = getWireType(compiler, field.type)
-    const tag = (field.tag << 3) | wireType
     const fieldVar = `value.${field.name}`
+    code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
 
-    const processField = (val) => {
-      let fieldCode = `size += ${compiler.callType(tag, 'varint')};\n`
-      const schema = compiler.types[field.type]
-      if (schema[0] === 'pstring') {
-        fieldCode += `size += ${compiler.callType(val, field.type)};\n`
-      } else if (wireType === 2) {
-        const dataSizeCode = compiler.callType(val, field.type)
-        fieldCode += `const dataSize = ${dataSizeCode};\n`
-        fieldCode += `size += ${compiler.callType('dataSize', 'varint')};\n`
-        fieldCode += 'size += dataSize;\n'
-      } else {
-        fieldCode += `size += ${compiler.callType(val, field.type)};\n`
+    if (field.repeated && field.packed) {
+      const packedTag = (field.tag << 3) | 2 // Packed fields are always wire type 2
+      code += `  const tagSize = ${compiler.callType(packedTag, 'varint')};\n`
+      code += '  let payloadSize = 0;\n'
+      code += `  for (const item of ${fieldVar}) {\n`
+      code += `    payloadSize += ${compiler.callType('item', field.type)};\n`
+      code += '  }\n'
+      code += `  size += tagSize + ${compiler.callType('payloadSize', 'varint')} + payloadSize;\n`
+    } else {
+      const wireType = getWireType(compiler, field.type)
+      const tag = (field.tag << 3) | wireType
+      const processField = (val) => {
+        let fieldCode = `size += ${compiler.callType(tag, 'varint')};\n`
+        const schema = compiler.types[field.type]
+        if (schema[0] === 'pstring') {
+          fieldCode += `size += ${compiler.callType(val, field.type)};\n`
+        } else if (wireType === 2) {
+          const dataSizeCode = compiler.callType(val, field.type)
+          fieldCode += `const dataSize = ${dataSizeCode};\n`
+          fieldCode += `size += ${compiler.callType('dataSize', 'varint')};\n`
+          fieldCode += 'size += dataSize;\n'
+        } else {
+          fieldCode += `size += ${compiler.callType(val, field.type)};\n`
+        }
+        return fieldCode
       }
-      return fieldCode
-    }
-
-    if (field.repeated) {
-      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
-      // FIX: Correctly handle packed repeated fields
-      if (field.packed) {
-        const packedTag = (field.tag << 3) | 2 // Packed fields are always wire type 2
-        code += `  const tagSize = ${compiler.callType(packedTag, 'varint')};\n`
-        code += '  let payloadSize = 0;\n'
-        code += `  for (const item of ${fieldVar}) {\n`
-        code += `    payloadSize += ${compiler.callType('item', field.type)};\n`
-        code += '  }\n'
-        code += `  size += tagSize + ${compiler.callType('payloadSize', 'varint')} + payloadSize;\n`
-      } else {
+      if (field.repeated) {
         code += `  for (const item of ${fieldVar}) {\n`
         code += compiler.indent(processField('item'), '    ')
         code += '  }\n'
+      } else {
+        code += compiler.indent(processField(fieldVar), '  ')
       }
-      code += '}\n'
-    } else {
-      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
-      code += compiler.indent(processField(fieldVar), '  ')
-      code += '}\n'
     }
+    code += '}\n'
   }
   code += 'return size;'
   return compiler.wrapCode(code)
@@ -79,47 +75,43 @@ function generateSizeOf (compiler, fields) {
 function generateWrite (compiler, fields) {
   let code = ''
   for (const field of fields) {
-    const wireType = getWireType(compiler, field.type)
-    const tag = (field.tag << 3) | wireType
     const fieldVar = `value.${field.name}`
+    code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
 
-    const processField = (val) => {
-      let fieldCode = `offset = ${compiler.callType(tag, 'varint')};\n`
-      const schema = compiler.types[field.type]
-      if (schema[0] === 'pstring') {
-        fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
-      } else if (wireType === 2) {
-        const dataSizeCode = `ctx.sizeOfCtx['${field.type}'](${val})`
-        fieldCode += `const dataSize = ${dataSizeCode};\n`
-        fieldCode += `offset = ${compiler.callType('dataSize', 'varint')};\n`
-        fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
-      } else {
-        fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
+    if (field.repeated && field.packed) {
+      const packedTag = (field.tag << 3) | 2 // Packed fields are always wire type 2
+      code += `  offset = ${compiler.callType(packedTag, 'varint')};\n`
+      code += '  let payloadSize = 0;\n'
+      code += `  for (const item of ${fieldVar}) { payloadSize += ctx.sizeOfCtx['${field.type}'](item); }\n`
+      code += `  offset = ${compiler.callType('payloadSize', 'varint')};\n`
+      code += `  for (const item of ${fieldVar}) { offset = ${compiler.callType('item', field.type)}; }\n`
+    } else {
+      const wireType = getWireType(compiler, field.type)
+      const tag = (field.tag << 3) | wireType
+      const processField = (val) => {
+        let fieldCode = `offset = ${compiler.callType(tag, 'varint')};\n`
+        const schema = compiler.types[field.type]
+        if (schema[0] === 'pstring') {
+          fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
+        } else if (wireType === 2) {
+          const dataSizeCode = `ctx.sizeOfCtx['${field.type}'](${val})`
+          fieldCode += `const dataSize = ${dataSizeCode};\n`
+          fieldCode += `offset = ${compiler.callType('dataSize', 'varint')};\n`
+          fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
+        } else {
+          fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
+        }
+        return fieldCode
       }
-      return fieldCode
-    }
-
-    if (field.repeated) {
-      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
-      // FIX: Correctly handle packed repeated fields
-      if (field.packed) {
-        const packedTag = (field.tag << 3) | 2 // Packed fields are always wire type 2
-        code += `  offset = ${compiler.callType(packedTag, 'varint')};\n`
-        code += '  let payloadSize = 0;\n'
-        code += `  for (const item of ${fieldVar}) { payloadSize += ctx.sizeOfCtx['${field.type}'](item); }\n`
-        code += `  offset = ${compiler.callType('payloadSize', 'varint')};\n`
-        code += `  for (const item of ${fieldVar}) { offset = ${compiler.callType('item', field.type)}; }\n`
-      } else {
+      if (field.repeated) {
         code += `  for (const item of ${fieldVar}) {\n`
         code += compiler.indent(processField('item'), '    ')
         code += '  }\n'
+      } else {
+        code += compiler.indent(processField(fieldVar), '  ')
       }
-      code += '}\n'
-    } else {
-      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
-      code += compiler.indent(processField(fieldVar), '  ')
-      code += '}\n'
     }
+    code += '}\n'
   }
   code += 'return offset;'
   return compiler.wrapCode(code)
@@ -128,7 +120,10 @@ function generateWrite (compiler, fields) {
 function generateRead (compiler, fields) {
   let code = 'const result = {};\n'
   code += 'let fieldValue, fieldSize, len, lenSize;\n'
-  code += 'const endOffset = buffer.length;\n'
+  // FIX: Correctly determine the end of the buffer for top-level vs. nested messages
+  code += 'const endOffset = size === undefined ? buffer.length : offset + size;\n'
+  // FIX: Rename local variable to avoid conflicting with parameter name
+  code += 'const initialOffset = offset;\n'
   code += 'while (offset < endOffset) {\n'
   code += '  if (offset >= endOffset) break;\n'
   code += '  const { value: tag, size: tagSize } = ctx.varint(buffer, offset); offset += tagSize;\n'
@@ -161,8 +156,8 @@ function generateRead (compiler, fields) {
       }
     } else if (getWireType(compiler, field.type) === 2) {
       readCode += '({ value: len, size: lenSize } = ctx.varint(buffer, offset)); offset += lenSize;\n'
-      readCode += `const subBuffer = buffer.slice(offset, offset + len);\n`
-      readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, '0', ['subBuffer'])});\n`
+      // FIX: Call the sub-parser directly to avoid the compiler's variable renaming bug.
+      readCode += `({ value: fieldValue, size: fieldSize } = ctx.${field.type}(buffer, offset, len, offset));\n`
       readCode += 'offset += len;\n'
       if (field.repeated) {
         readCode += `if (result.${field.name} === undefined) result.${field.name} = [];\n`
@@ -193,8 +188,8 @@ function generateRead (compiler, fields) {
   code += '      break;\n'
   code += '  }\n'
   code += '}\n'
-  code += 'return { value: result, size: offset };'
-  return compiler.wrapCode(code)
+  code += 'return { value: result, size: offset - initialOffset };'
+  return compiler.wrapCode(code, ['size', 'oldOffset'])
 }
 
 module.exports = {

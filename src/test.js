@@ -42,14 +42,14 @@ const protoFileContent = `
 async function runTest (useCompiler = true) {
   console.log('--- Step 1: Parsing .proto file content ---')
   const ast = schemaParser.parse(protoFileContent)
-  // console.log('AST generated successfully.', JSON.stringify(ast, null, 2))
+  console.log('AST generated successfully.', JSON.stringify(ast))
 
   console.log('\n--- Step 2: Transpiling AST to protodef schema ---')
   const generatedSchema = transpileProtobufAST(ast)
   // Define 'string' as a pstring with a varint length prefix for protodef
   generatedSchema.string = ['pstring', { countType: 'varint' }]
   console.log('Protodef schema generated.')
-  // console.log(JSON.stringify(generatedSchema, null, 2))
+  console.log(JSON.stringify(generatedSchema))
 
   console.log('\n--- Step 3: Setting up ProtoDef instance ---')
   console.log('Adding Types')
