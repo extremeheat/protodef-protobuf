@@ -44,7 +44,8 @@ async function runTest (useCompiler = true) {
 
   console.log('\n--- Step 2: Transpiling AST to protodef schema ---')
   const generatedSchema = transpileProtobufAST(ast)
-  generatedSchema.protobuf_container = 'native'
+  // TODO: Should this be in the Protocol Buffer transpiler?
+  generatedSchema.string = ['pstring', { countType: 'varint' }]
   console.log('Protodef schema generated:')
   console.log(JSON.stringify(generatedSchema, null, 2))
 
@@ -83,7 +84,7 @@ async function runTest (useCompiler = true) {
     // This will call our unimplemented sizeOf and write functions
     console.log('\nAttempting to create packet buffer...')
     const buffer = proto.createPacketBuffer(mainType, packetData)
-    console.log(`Buffer created (size: ${buffer.length}). This will be 0 until implementation.`)
+    console.log(`Buffer created (${buffer.length} bytes): ${buffer.toString('hex')}`)
 
     // This will call our unimplemented read function
     console.log('\nAttempting to parse packet buffer...')

@@ -1,19 +1,15 @@
 // src/datatypes_compiler.js
 // Implementation for the protobuf_container compiler (parameterizable) type
 
-// A map from protodef types to their corresponding protobuf wire type.
 const WIRE_TYPES = {
   varint: 0,
   zigzag32: 0,
   zigzag64: 0,
-  // 64-bit types
   li64: 1,
   lu64: 1,
   lf64: 1,
-  // Length-delimited types
   string: 2,
   buffer: 2,
-  // 32-bit types
   li32: 5,
   lu32: 5,
   lf32: 5
@@ -21,12 +17,11 @@ const WIRE_TYPES = {
 
 function getWireType (compiler, type) {
   if (WIRE_TYPES[type] !== undefined) return WIRE_TYPES[type]
-  // For complex types like nested messages or mappers, the underlying type determines the wire type.
-  console.log('Compiler', compiler.types)
+  // console.log('Compiler', compiler.types)
   const schema = compiler.types[type]
   if (!schema) throw new Error(`Unknown type: ${type}`)
-  if (schema[0] === 'container' || schema[0] === 'protobuf_container') return 2 // Nested messages are length-delimited
-  if (schema[0] === 'mapper') return getWireType(compiler, schema[1].type) // Look at the mapper's underlying type
+  if (schema[0] === 'container' || schema[0] === 'protobuf_container') return 2
+  if (schema[0] === 'mapper') return getWireType(compiler, schema[1].type)
   throw new Error(`Could not determine wire type for ${type}`)
 }
 
@@ -38,25 +33,25 @@ function generateSizeOf (compiler, fields) {
     const fieldVar = `value.${field.name}`
 
     const processField = (val) => {
-      let fieldCode = `size += ${compiler.callType('varint', tag)};\n`
+      let fieldCode = `size += ${compiler.callType(tag, 'varint')};\n`
       if (wireType === 2) { // Length-delimited
-        fieldCode += `const dataSize = ${compiler.callType(field.type, val)};\n`
-        fieldCode += `size += ${compiler.callType('varint', 'dataSize')};\n`
+        fieldCode += `const dataSize = ${compiler.callType(val, field.type)}; /*field.type=${field.type}*/\n`
+        fieldCode += `size += ${compiler.callType('dataSize', 'varint')};\n`
         fieldCode += 'size += dataSize;\n'
       } else {
-        fieldCode += `size += ${compiler.callType(field.type, val)};\n`
+        fieldCode += `size += ${compiler.callType(val, field.type)};\n`
       }
       return fieldCode
     }
 
     if (field.repeated) {
-      code += `if (${fieldVar} !== undefined) {\n`
-      code += ` for (const item of ${fieldVar}) {\n`
-      code += compiler.indent(processField('item'), 2)
-      code += ' }\n'
+      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
+      code += `  for (const item of ${fieldVar}) {\n`
+      code += compiler.indent(processField('item'), '  ')
+      code += '  }\n'
       code += '}\n'
     } else {
-      code += `if (${fieldVar} !== undefined) {\n`
+      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
       code += compiler.indent(processField(fieldVar))
       code += '}\n'
     }
@@ -73,25 +68,26 @@ function generateWrite (compiler, fields) {
     const fieldVar = `value.${field.name}`
 
     const processField = (val) => {
-      let fieldCode = `offset = ${compiler.callWrite('varint', tag, 'offset')};\n`
+      let fieldCode = `offset = ${compiler.callType(tag, 'varint')};\n`
       if (wireType === 2) { // Length-delimited
-        fieldCode += `const dataSize = ${compiler.callType(field.type, val)};\n`
-        fieldCode += `offset = ${compiler.callWrite('varint', 'dataSize', 'offset')};\n`
-        fieldCode += `offset = ${compiler.callWrite(field.type, val, 'offset')};\n`
+        // Use the injected sizeOf context
+        fieldCode += `const dataSize = ctx.sizeOfCtx['${field.type}'](${val});\n`
+        fieldCode += `offset = ${compiler.callType('dataSize', 'varint')};\n`
+        fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
       } else {
-        fieldCode += `offset = ${compiler.callWrite(field.type, val, 'offset')};\n`
+        fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
       }
       return fieldCode
     }
 
     if (field.repeated) {
-      code += `if (${fieldVar} !== undefined) {\n`
-      code += ` for (const item of ${fieldVar}) {\n`
-      code += compiler.indent(processField('item'), 2)
-      code += ' }\n'
+      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
+      code += `  for (const item of ${fieldVar}) {\n`
+      code += compiler.indent(processField('item'), '  ')
+      code += '  }\n'
       code += '}\n'
     } else {
-      code += `if (${fieldVar} !== undefined) {\n`
+      code += `if (${fieldVar} !== undefined && ${fieldVar} !== null) {\n`
       code += compiler.indent(processField(fieldVar))
       code += '}\n'
     }
@@ -102,9 +98,12 @@ function generateWrite (compiler, fields) {
 
 function generateRead (compiler, fields) {
   let code = 'const result = {};\n'
+  // FIX: Declare re-assignable variables outside the switch statement
+  code += 'let fieldValue, fieldSize, len, lenSize;\n'
   code += 'const endOffset = offset + size;\n'
   code += 'while (offset < endOffset) {\n'
-  code += '  const { value: tag, size: tagSize } = ctx.varint.read(buffer, offset); offset += tagSize;\n'
+  code += '  if (offset >= endOffset) break;\n'
+  code += '  const { value: tag, size: tagSize } = ctx.varint(buffer, offset); offset += tagSize;\n'
   code += '  const fieldNumber = tag >> 3;\n'
   code += '  const wireType = tag & 7;\n'
   code += '  switch (fieldNumber) {\n'
@@ -112,30 +111,37 @@ function generateRead (compiler, fields) {
   for (const field of fields) {
     code += `    case ${field.tag}:\n`
     let readCode = ''
-    const wireType = getWireType(compiler, field.type)
-    if (wireType === 2) { // Length-delimited
-      readCode += 'const { value: len, size: lenSize } = ctx.varint.read(buffer, offset); offset += lenSize;\n'
-      readCode += `const { value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'len', 'offset')};\n`
+    const currentWireType = getWireType(compiler, field.type)
+
+    // FIX: Use destructuring assignment to an existing variable, not a const declaration
+    if (currentWireType === 2) { // Length-delimited
+      readCode += '({ value: len, size: lenSize } = ctx.varint(buffer, offset)); offset += lenSize;\n'
+      // FIX: Manually call the correct pstring reader for the 'string' type
+      if (field.type === 'string') {
+        readCode += `({ value: fieldValue, size: fieldSize } = ctx.pstring(buffer, offset, { countType: ctx.varint, count: len }));\n`
+      } else {
+        readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'offset', ['len'])});\n`
+      }
+      readCode += 'offset += len;\n'
     } else {
-      readCode += `const { value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, undefined, 'offset')};\n`
+      readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'offset')});\n`
+      readCode += 'offset += fieldSize;\n'
     }
-    readCode += 'offset += fieldSize;\n'
     if (field.repeated) {
       readCode += `if (result.${field.name} === undefined) result.${field.name} = [];\n`
       readCode += `result.${field.name}.push(fieldValue);\n`
     } else {
       readCode += `result.${field.name} = fieldValue;\n`
     }
-    code += compiler.indent(readCode, 3)
+    code += compiler.indent(readCode, '    ')
     code += '      break;\n'
   }
 
   code += '    default:\n'
-  // Simplified skip logic for unknown fields
   code += '      console.warn(`Skipping unknown field with tag ${fieldNumber} and wire type ${wireType}`);\n'
-  code += '      if (wireType === 0) { offset += ctx.varint.read(buffer, offset).size; }\n'
+  code += '      if (wireType === 0) { const { size } = ctx.varint(buffer, offset); offset += size; }\n'
   code += '      else if (wireType === 1) { offset += 8; }\n'
-  code += '      else if (wireType === 2) { const { value: len, size: lenSize } = ctx.varint.read(buffer, offset); offset += lenSize + len; }\n'
+  code += '      else if (wireType === 2) { ({ value: len, size: lenSize } = ctx.varint(buffer, offset)); offset += lenSize + len; }\n'
   code += '      else if (wireType === 5) { offset += 4; }\n'
   code += '      break;\n'
   code += '  }\n'

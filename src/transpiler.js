@@ -6,14 +6,13 @@
  */
 
 // A mapping from Protobuf types to node-protodef's specific built-in types.
-// This is crucial for generating a correct schema.
 const PROTO_TO_PROTODEF_TYPE_MAP = {
   // VarInt
   int32: 'varint',
   uint32: 'varint',
-  int64: 'varint', // Note: JavaScript's number safety limits may apply.
+  int64: 'varint',
   uint64: 'varint',
-  bool: 'bool', // bool is encoded as a varint(0 or 1), but protodef handles this mapping.
+  bool: 'bool',
   enum: 'varint',
 
   // ZigZag VarInt
@@ -45,20 +44,25 @@ function processNode (node, prefix, schema) {
   // Process nested messages
   if (node.messages) {
     for (const message of node.messages) {
-      const messagePrefix = `${prefix}${message.name}_`
       const protodefTypeName = `${prefix}${message.name}`
+      const messagePrefixForNesting = `${protodefTypeName}_`
 
       const fields = message.fields.map(field => {
         let fieldType = PROTO_TO_PROTODEF_TYPE_MAP[field.type]
 
-        // If the type is not a primitive, it's a reference to another message or enum.
-        // We must resolve its full name, searching from the current scope outwards.
-        // For simplicity here, we assume it's either a primitive or a type defined
-        // in the same file, so we prepend the full package prefix.
         if (!fieldType) {
-          // This logic could be enhanced to handle complex lookups (e.g., ../OtherType)
-          // For now, we assume the full prefix is correct.
-          fieldType = `${prefix}${field.type}`
+          // FIX: Correctly resolve nested vs. sibling/global types.
+          const isNested = (message.messages && message.messages.some(m => m.name === field.type)) ||
+                           (message.enums && message.enums.some(e => e.name === field.type))
+
+          if (isNested) {
+            // If it's a nested type, its full name is prefixed with the parent message's full name.
+            fieldType = `${protodefTypeName}_${field.type}`
+          } else {
+            // Otherwise, assume it's in the global package scope.
+            const globalPrefix = node.package ? node.package.replace(/\./g, '_') + '_' : ''
+            fieldType = `${globalPrefix}${field.type}`
+          }
         }
 
         return {
@@ -66,15 +70,14 @@ function processNode (node, prefix, schema) {
           type: fieldType,
           tag: field.tag,
           repeated: field.repeated,
-          required: field.required // proto2 specific
+          required: field.required
         }
       })
 
-      // Define the message type in the schema using our custom container.
       schema[protodefTypeName] = ['protobuf_container', fields]
 
       // Recurse into the nested message to define its own nested types
-      processNode(message, messagePrefix, schema)
+      processNode(message, messagePrefixForNesting, schema)
     }
   }
 
@@ -82,14 +85,11 @@ function processNode (node, prefix, schema) {
   if (node.enums) {
     for (const anEnum of node.enums) {
       const protodefTypeName = `${prefix}${anEnum.name}`
-      // FIX: Use the 'mapper' type instead of 'enum'.
-      // The mappings object needs to have the numeric value as the key.
       const mappings = {}
       for (const key in anEnum.values) {
         const numericValue = anEnum.values[key].value
         mappings[numericValue] = key
       }
-      // Protobuf enums are encoded as varints, so the underlying type is 'varint'.
       schema[protodefTypeName] = ['mapper', { type: 'varint', mappings }]
     }
   }
@@ -102,12 +102,8 @@ function processNode (node, prefix, schema) {
  */
 function transpileProtobufAST (ast) {
   const protodefSchema = {}
-  // Create a base prefix from the package name.
   const packagePrefix = ast.package ? ast.package.replace(/\./g, '_') + '_' : ''
-
-  // Start the recursive processing from the root of the AST.
   processNode(ast, packagePrefix, protodefSchema)
-
   return protodefSchema
 }
 
