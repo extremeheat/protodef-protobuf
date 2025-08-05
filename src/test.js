@@ -10,8 +10,9 @@
 const schemaParser = require('protocol-buffers-schema')
 const { ProtoDef, Compiler: { ProtoDefCompiler } } = require('protodef')
 const { transpileProtobufAST } = require('./transpiler.js')
+const assert = require('assert')
 
-// A more complex .proto schema with nested types, enums, and packages.
+// A more complex .proto schema with nested types, enums, packages, and maps.
 const protoFileContent = `
   syntax = "proto2";
   package my.game;
@@ -35,6 +36,8 @@ const protoFileContent = `
     optional Position pos = 4;
 
     repeated int32 items = 5 [packed=true];
+
+    map<string, int32> stats = 6;
   }
 `
 
@@ -42,14 +45,14 @@ const protoFileContent = `
 async function runTest (useCompiler = true) {
   console.log('--- Step 1: Parsing .proto file content ---')
   const ast = schemaParser.parse(protoFileContent)
-  console.log('AST generated successfully.', JSON.stringify(ast))
+  // console.log('AST generated successfully.', JSON.stringify(ast, null, 2))
 
   console.log('\n--- Step 2: Transpiling AST to protodef schema ---')
   const generatedSchema = transpileProtobufAST(ast)
   // Define 'string' as a pstring with a varint length prefix for protodef
   generatedSchema.string = ['pstring', { countType: 'varint' }]
   console.log('Protodef schema generated.')
-  console.log(JSON.stringify(generatedSchema))
+  // console.log(JSON.stringify(generatedSchema, null, 2))
 
   console.log('\n--- Step 3: Setting up ProtoDef instance ---')
   console.log('Adding Types')
@@ -82,7 +85,12 @@ async function runTest (useCompiler = true) {
       y: 20.0,
       z: -5.25
     },
-    items: [100, 200, 300]
+    items: [100, 200, 300],
+    // Protodef doesn't have a native map type, so we represent it as an array of key-value objects
+    stats: [
+      { key: 'strength', value: 15 },
+      { key: 'mana', value: 100 }
+    ]
   }
 
   try {
@@ -96,11 +104,8 @@ async function runTest (useCompiler = true) {
     console.log('Parsed Data:', JSON.stringify(result.data, null, 2))
 
     // Basic validation
-    if (JSON.stringify(packetData) !== JSON.stringify(result.data)) {
-      console.error('\nERROR: Serialized and deserialized data do not match!')
-    } else {
-      console.log('\nSUCCESS: Data matches perfectly!')
-    }
+    assert.deepStrictEqual(packetData, result.data, 'Serialized and deserialized data do not match!')
+    console.log('\nSUCCESS: Data matches perfectly!')
   } catch (e) {
     console.error('\nAn error occurred during serialization/deserialization:')
     console.log(e)
@@ -110,4 +115,3 @@ async function runTest (useCompiler = true) {
 }
 
 runTest()
-

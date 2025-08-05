@@ -120,9 +120,7 @@ function generateWrite (compiler, fields) {
 function generateRead (compiler, fields) {
   let code = 'const result = {};\n'
   code += 'let fieldValue, fieldSize, len, lenSize;\n'
-  // FIX: Correctly determine the end of the buffer for top-level vs. nested messages
   code += 'const endOffset = size === undefined ? buffer.length : offset + size;\n'
-  // FIX: Rename local variable to avoid conflicting with parameter name
   code += 'const initialOffset = offset;\n'
   code += 'while (offset < endOffset) {\n'
   code += '  if (offset >= endOffset) break;\n'
@@ -156,7 +154,7 @@ function generateRead (compiler, fields) {
       }
     } else if (getWireType(compiler, field.type) === 2) {
       readCode += '({ value: len, size: lenSize } = ctx.varint(buffer, offset)); offset += lenSize;\n'
-      // FIX: Call the sub-parser directly to avoid the compiler's variable renaming bug.
+      // Use the direct call to avoid the compiler's variable renaming bug.
       readCode += `({ value: fieldValue, size: fieldSize } = ctx.${field.type}(buffer, offset, len, offset));\n`
       readCode += 'offset += len;\n'
       if (field.repeated) {
