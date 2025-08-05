@@ -1,4 +1,5 @@
 // src/datatypes_compiler.js
+/* eslint-disable camelcase, no-template-curly-in-string */
 // Implementation for the protobuf_container compiler (parameterizable) type
 
 const WIRE_TYPES = {
@@ -17,11 +18,11 @@ const WIRE_TYPES = {
 
 function getWireType (compiler, type) {
   if (WIRE_TYPES[type] !== undefined) return WIRE_TYPES[type]
-  // console.log('Compiler', compiler.types)
   const schema = compiler.types[type]
   if (!schema) throw new Error(`Unknown type: ${type}`)
   if (schema[0] === 'container' || schema[0] === 'protobuf_container') return 2
   if (schema[0] === 'mapper') return getWireType(compiler, schema[1].type)
+  if (schema[0] === 'pstring') return 2
   throw new Error(`Could not determine wire type for ${type}`)
 }
 
@@ -34,8 +35,13 @@ function generateSizeOf (compiler, fields) {
 
     const processField = (val) => {
       let fieldCode = `size += ${compiler.callType(tag, 'varint')};\n`
-      if (wireType === 2) { // Length-delimited
-        fieldCode += `const dataSize = ${compiler.callType(val, field.type)}; /*field.type=${field.type}*/\n`
+      const schema = compiler.types[field.type]
+      // FIX: Let pstring handle its own size. Manually handle our container's size.
+      if (schema[0] === 'pstring') {
+        fieldCode += `size += ${compiler.callType(val, field.type)};\n`
+      } else if (wireType === 2) {
+        const dataSizeCode = compiler.callType(val, field.type)
+        fieldCode += `const dataSize = ${dataSizeCode};\n`
         fieldCode += `size += ${compiler.callType('dataSize', 'varint')};\n`
         fieldCode += 'size += dataSize;\n'
       } else {
@@ -69,9 +75,13 @@ function generateWrite (compiler, fields) {
 
     const processField = (val) => {
       let fieldCode = `offset = ${compiler.callType(tag, 'varint')};\n`
-      if (wireType === 2) { // Length-delimited
-        // Use the injected sizeOf context
-        fieldCode += `const dataSize = ctx.sizeOfCtx['${field.type}'](${val});\n`
+      const schema = compiler.types[field.type]
+      // FIX: Let pstring handle its own write. Manually handle our container's write.
+      if (schema[0] === 'pstring') {
+        fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
+      } else if (wireType === 2) {
+        const dataSizeCode = `ctx.sizeOfCtx['${field.type}'](${val})`
+        fieldCode += `const dataSize = ${dataSizeCode};\n`
         fieldCode += `offset = ${compiler.callType('dataSize', 'varint')};\n`
         fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
       } else {
@@ -98,9 +108,9 @@ function generateWrite (compiler, fields) {
 
 function generateRead (compiler, fields) {
   let code = 'const result = {};\n'
-  // FIX: Declare re-assignable variables outside the switch statement
   code += 'let fieldValue, fieldSize, len, lenSize;\n'
-  code += 'const endOffset = offset + size;\n'
+  // The top-level message consumes the whole buffer. Nested messages are passed a sub-buffer.
+  code += 'const endOffset = buffer.length;\n'
   code += 'while (offset < endOffset) {\n'
   code += '  if (offset >= endOffset) break;\n'
   code += '  const { value: tag, size: tagSize } = ctx.varint(buffer, offset); offset += tagSize;\n'
@@ -111,22 +121,27 @@ function generateRead (compiler, fields) {
   for (const field of fields) {
     code += `    case ${field.tag}:\n`
     let readCode = ''
-    const currentWireType = getWireType(compiler, field.type)
+    const schema = compiler.types[field.type]
 
-    // FIX: Use destructuring assignment to an existing variable, not a const declaration
-    if (currentWireType === 2) { // Length-delimited
+    // FIX: Let pstring handle its own read. Manually handle our container's read.
+    // The 'string' type is a pstring, which reads its own length prefix.
+    // Our container should NOT read a length prefix for it.
+    if (schema[0] === 'pstring') {
+      readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'offset')});\n`
+      readCode += 'offset += fieldSize;\n'
+    } else if (getWireType(compiler, field.type) === 2) {
+      // For nested messages, we read the length and pass it to the sub-parser.
       readCode += '({ value: len, size: lenSize } = ctx.varint(buffer, offset)); offset += lenSize;\n'
-      // FIX: Manually call the correct pstring reader for the 'string' type
-      if (field.type === 'string') {
-        readCode += `({ value: fieldValue, size: fieldSize } = ctx.pstring(buffer, offset, { countType: ctx.varint, count: len }));\n`
-      } else {
-        readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'offset', ['len'])});\n`
-      }
+      // FIX: Pass the current offset as the 'oldOffset' argument
+      // readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'offset', ['len', 'offset'])});\n`
+      readCode += `({ value: fieldValue, size: fieldSize } = ctx.${field.type}(buffer, offset, len, offset));\n`
       readCode += 'offset += len;\n'
     } else {
+      // For all other primitive types.
       readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'offset')});\n`
       readCode += 'offset += fieldSize;\n'
     }
+
     if (field.repeated) {
       readCode += `if (result.${field.name} === undefined) result.${field.name} = [];\n`
       readCode += `result.${field.name}.push(fieldValue);\n`
@@ -146,8 +161,8 @@ function generateRead (compiler, fields) {
   code += '      break;\n'
   code += '  }\n'
   code += '}\n'
-  code += 'return { value: result, size: offset - oldOffset };'
-  return compiler.wrapCode(code, ['size', 'oldOffset'])
+  code += 'return { value: result, size: offset };'
+  return compiler.wrapCode(code)
 }
 
 module.exports = {

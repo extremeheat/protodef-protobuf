@@ -1,3 +1,4 @@
+/* eslint-disable camelcase, no-template-curly-in-string */
 /**
  * datatypes.js
  * * This file defines the custom 'protobuf_container' type for node-protodef.

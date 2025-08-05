@@ -57,12 +57,12 @@ async function runTest (useCompiler = true) {
   if (useCompiler) {
     const compiler = new ProtoDefCompiler()
     compiler.addTypes(require('./datatypes_compiler.js'))
-    compiler.addTypesToCompile(generatedSchema) // Add the types we just generated
+    compiler.addTypesToCompile(generatedSchema)
     proto = compiler.compileProtoDefSync()
   } else {
     proto = new ProtoDef()
     proto.addTypes(require('./datatypes.js')) // Add our custom datatypes
-    proto.addTypes(generatedSchema) // Add the types we just generated
+    proto.addTypes(generatedSchema)
   }
   console.log('ProtoDef instance created and types added.')
 
