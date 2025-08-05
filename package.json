@@ -21,8 +21,12 @@
   },
   "homepage": "https://github.com/extremeheat/prismarine-template#readme",
   "devDependencies": {
+    "mocha": "^11.1.0",
     "prismarine-template": "file:.",
-    "standard": "^17.0.0",
-    "mocha": "^11.1.0"
+    "standard": "^17.0.0"
+  },
+  "dependencies": {
+    "protocol-buffers-schema": "^3.6.0",
+    "protodef": "^1.19.0"
   }
 }
