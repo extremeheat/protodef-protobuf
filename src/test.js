@@ -33,6 +33,8 @@ const protoFileContent = `
       required float z = 3;
     }
     optional Position pos = 4;
+
+    repeated int32 items = 5 [packed=true];
   }
 `
 
@@ -40,28 +42,30 @@ const protoFileContent = `
 async function runTest (useCompiler = true) {
   console.log('--- Step 1: Parsing .proto file content ---')
   const ast = schemaParser.parse(protoFileContent)
-  console.log('AST generated successfully.', JSON.stringify(ast))
+  // console.log('AST generated successfully.', JSON.stringify(ast, null, 2))
 
   console.log('\n--- Step 2: Transpiling AST to protodef schema ---')
   const generatedSchema = transpileProtobufAST(ast)
-  // TODO: Should this be in the Protocol Buffer transpiler?
+  // Define 'string' as a pstring with a varint length prefix for protodef
   generatedSchema.string = ['pstring', { countType: 'varint' }]
-  console.log('Protodef schema generated:')
-  console.log(JSON.stringify(generatedSchema, null, 2))
+  console.log('Protodef schema generated.')
+  // console.log(JSON.stringify(generatedSchema, null, 2))
 
   console.log('\n--- Step 3: Setting up ProtoDef instance ---')
   console.log('Adding Types')
 
   let proto
-  // Add our custom 'protobuf_container'
   if (useCompiler) {
     const compiler = new ProtoDefCompiler()
     compiler.addTypes(require('./datatypes_compiler.js'))
     compiler.addTypesToCompile(generatedSchema)
     proto = compiler.compileProtoDefSync()
+    // This is our patch to allow write functions to access sizeOf functions
+    proto.writeCtx.sizeOfCtx = proto.sizeOfCtx
   } else {
+    // Interpreter path (not fully implemented)
     proto = new ProtoDef()
-    proto.addTypes(require('./datatypes.js')) // Add our custom datatypes
+    proto.addTypes(require('./datatypes.js'))
     proto.addTypes(generatedSchema)
   }
   console.log('ProtoDef instance created and types added.')
@@ -72,32 +76,38 @@ async function runTest (useCompiler = true) {
   const packetData = {
     id: 123,
     name: 'PlayerOne',
-    state: 'ACTIVE', // Enums are handled by name
+    state: 'ACTIVE',
     pos: {
       x: 10.5,
       y: 20.0,
       z: -5.25
-    }
+    },
+    items: [100, 200, 300]
   }
 
   try {
-    // This will call our unimplemented sizeOf and write functions
     console.log('\nAttempting to create packet buffer...')
     const buffer = proto.createPacketBuffer(mainType, packetData)
     console.log(`Buffer created (${buffer.length} bytes): ${buffer.toString('hex')}`)
 
-    // This will call our unimplemented read function
     console.log('\nAttempting to parse packet buffer...')
     const result = proto.parsePacketBuffer(mainType, buffer)
-    console.log('Packet parsed successfully (result will be dummy data).')
+    console.log('Packet parsed successfully.')
     console.log('Parsed Data:', JSON.stringify(result.data, null, 2))
+
+    // Basic validation
+    if (JSON.stringify(packetData) !== JSON.stringify(result.data)) {
+      console.error('\nERROR: Serialized and deserialized data do not match!')
+    } else {
+      console.log('\nSUCCESS: Data matches perfectly!')
+    }
   } catch (e) {
     console.error('\nAn error occurred during serialization/deserialization:')
     console.log(e)
   }
 
   console.log('\n--- Test Complete ---')
-  console.log('If you see errors from datatypes.js, it means the pipeline is working!')
 }
 
 runTest()
+
