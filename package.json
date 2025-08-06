@@ -1,5 +1,5 @@
 {
-  "name": "prismarine-template",
+  "name": "protodef-protobuf",
   "version": "1.0.0",
   "description": "A template repository to make it easy to create new prismarine repo",
   "main": "src/index.js",
@@ -11,18 +11,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/extremeheat/prismarine-template.git"
+    "url": "git+https://github.com/extremeheat/protodef-protobuf.git"
   },
   "keywords": [],
   "author": "extremeheat",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/extremeheat/prismarine-template/issues"
+    "url": "https://github.com/extremeheat/protodef-protobuf/issues"
   },
-  "homepage": "https://github.com/extremeheat/prismarine-template#readme",
+  "homepage": "https://github.com/extremeheat/protodef-protobuf#readme",
   "devDependencies": {
     "mocha": "^11.1.0",
-    "prismarine-template": "file:.",
+    "protodef-protobuf": "file:.",
     "standard": "^17.0.0"
   },
   "dependencies": {
