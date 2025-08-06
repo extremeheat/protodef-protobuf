@@ -7,7 +7,7 @@ const WIRE_TYPES = {
   li64: 1,
   lu64: 1,
   lf64: 1,
-  string: 2,
+  protobuf_string: 2,
   buffer: 2,
   li32: 5,
   lu32: 5,
@@ -33,7 +33,7 @@ const PROTO_TO_PROTODEF_TYPE_MAP = {
   sfixed64: 'li64',
   double: 'lf64',
   // Length-Delimited
-  string: 'string',
+  string: 'protobuf_string',
   bytes: 'buffer'
 }
 

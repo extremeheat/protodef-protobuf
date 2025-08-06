@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
 /**
- * src/datatypes/interpreter.js
+ * datatypes.js
  *
  * Interpreter version of protobuf datatypes for node-protodef.
  * This implementation is designed to be easily portable to Rust.
@@ -12,7 +12,7 @@
  * - Direct execution suitable for Rust translation
  */
 
-const { WIRE_TYPES } = require('../util.js')
+const { WIRE_TYPES } = require('./util.js')
 
 function readProtobufContainer (buffer, offset, typeArgs, context, size) {
   const result = {}

@@ -13,7 +13,7 @@ const { transpileProtobufAST, mergeAsts } = require('../src/transpiler.js')
 const assert = require('assert')
 
 function createProtoDef (generatedSchema) {
-  generatedSchema.string = ['pstring', { countType: 'varint' }]
+  generatedSchema.protobuf_string = ['pstring', { countType: 'varint' }]
   const compiler = new ProtoDefCompiler()
   compiler.addTypes(require('../src/datatypes/compiler.js'))
   compiler.addTypesToCompile(generatedSchema)

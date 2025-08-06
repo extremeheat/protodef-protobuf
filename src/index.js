@@ -19,13 +19,11 @@ function transpile (schemas) {
  * @param {ProtoDefCompiler} compiler - An instance of the ProtoDefCompiler.
  */
 function addTypesToCompiler (compiler) {
-  // Ensure we have a string type...
-  // TODO: we really should have our own string type to avoid collision with user-defined strings
-  compiler.addTypesToCompile({
-    string: ['pstring', { countType: 'varint' }],
-    bool: 'native'
-  })
   compiler.addTypes(compilerTypes)
+  // Add type aliases that the transpiler generates
+  compiler.addTypesToCompile({
+    protobuf_string: ['pstring', { countType: 'varint' }]
+  })
 }
 
 /**
@@ -33,11 +31,6 @@ function addTypesToCompiler (compiler) {
  * @param {ProtoDef} protodef - An instance of the ProtoDef interpreter.
  */
 function addTypesToInterpreter (protodef) {
-  // Ensure we have a string type...
-  protodef.addTypes({
-    string: ['pstring', { countType: 'varint' }],
-    bool: 'native'
-  })
   protodef.addTypes(interpreterTypes)
 }
 
