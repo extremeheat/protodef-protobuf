@@ -2,7 +2,7 @@ name: npm-publish
 on:
   push:
     branches:
-      - master # Change this to your default branch
+      - main
 jobs:
   npm-publish:
     name: npm-publish
@@ -29,4 +29,5 @@ jobs:
         release_name: Release ${{ steps.publish.outputs.version }}
         body: ${{ steps.publish.outputs.version }}
         draft: false
+
         prerelease: false
