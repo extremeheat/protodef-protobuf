@@ -1,6 +1,6 @@
 // src/datatypes_compiler.js
 /* eslint-disable camelcase, no-template-curly-in-string */
-// Implementation for the protobuf_container compiler (parameterizable) type
+// Implementation for the protobuf_container and protobuf_message compiler types
 
 const WIRE_TYPES = {
   varint: 0,
@@ -154,7 +154,6 @@ function generateRead (compiler, fields) {
       }
     } else if (getWireType(compiler, field.type) === 2) {
       readCode += '({ value: len, size: lenSize } = ctx.varint(buffer, offset)); offset += lenSize;\n'
-      // Use the direct call to avoid the compiler's variable renaming bug.
       readCode += `({ value: fieldValue, size: fieldSize } = ctx.${field.type}(buffer, offset, len, offset));\n`
       readCode += 'offset += len;\n'
       if (field.repeated) {
@@ -190,8 +189,62 @@ function generateRead (compiler, fields) {
   return compiler.wrapCode(code, ['size', 'oldOffset'])
 }
 
+// NEW: The flexible, encapsulated protobuf_message type
+const protobuf_message = {
+  Read: ['parametrizable', (compiler, { length, lengthType, type }) => {
+    let code = ''
+    if (lengthType) {
+      code += `const { value: len, size: lenSize } = ${compiler.callType(lengthType, 'offset')};\n`
+      code += 'const totalSize = len + lenSize;\n'
+      code += 'const subBuffer = buffer.slice(offset + lenSize, offset + totalSize);\n'
+    } else if (length) {
+      code += `const len = ${compiler.getField(length, true)};\n`
+      code += 'const totalSize = len;\n'
+      code += 'const subBuffer = buffer.slice(offset, offset + totalSize);\n'
+    } else {
+      throw new Error('protobuf_message must have either lengthType or length')
+    }
+    code += `const { value } = ctx['${type}'](subBuffer, 0, subBuffer.length, 0);\n`
+    code += 'return { value, size: totalSize };'
+    return compiler.wrapCode(code)
+  }],
+  Write: ['parametrizable', (compiler, { length, lengthType, type }) => {
+    let code = ''
+    if (lengthType) {
+      code += `const payloadSize = ctx.sizeOfCtx['${type}'](value);\n`
+      code += `offset = ${compiler.callType('payloadSize', lengthType)};\n`
+    } else if (!length) {
+      throw new Error('protobuf_message must have either lengthType or length')
+    }
+    code += `offset = ${compiler.callType('value', type)};\n`
+    code += 'return offset;'
+    return compiler.wrapCode(code)
+  }],
+  SizeOf: ['parametrizable', (compiler, { length, lengthType, type }) => {
+    let code = 'let size = 0;\n'
+    code += `const payloadSize = ${compiler.callType('value', type)};\n`
+    if (lengthType) {
+      code += `size += ${compiler.callType('payloadSize', lengthType)};\n`
+    } else if (!length) {
+      throw new Error('protobuf_message must have either lengthType or length')
+    }
+    code += 'size += payloadSize;\n'
+    code += 'return size;'
+    return compiler.wrapCode(code)
+  }]
+}
+
 module.exports = {
-  Read: { protobuf_container: ['parametrizable', generateRead] },
-  Write: { protobuf_container: ['parametrizable', generateWrite] },
-  SizeOf: { protobuf_container: ['parametrizable', generateSizeOf] }
+  Read: {
+    protobuf_container: ['parametrizable', generateRead],
+    protobuf_message: protobuf_message.Read
+  },
+  Write: {
+    protobuf_container: ['parametrizable', generateWrite],
+    protobuf_message: protobuf_message.Write
+  },
+  SizeOf: {
+    protobuf_container: ['parametrizable', generateSizeOf],
+    protobuf_message: protobuf_message.SizeOf
+  }
 }
