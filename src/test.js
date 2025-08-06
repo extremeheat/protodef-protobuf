@@ -7,7 +7,7 @@
  */
 
 const schemaParser = require('protocol-buffers-schema')
-const { ProtoDef, Compiler: { ProtoDefCompiler } } = require('protodef')
+const { Compiler: { ProtoDefCompiler } } = require('protodef')
 const { transpileProtobufAST, mergeAsts } = require('./transpiler.js')
 const assert = require('assert')
 

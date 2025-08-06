@@ -46,7 +46,7 @@ function generateSizeOf (compiler, fields) {
       const processField = (val) => {
         let fieldCode = `size += ${compiler.callType(tag, 'varint')};\n`
         const schema = compiler.types[field.type]
-        if (schema[0] === 'pstring') {
+        if (schema && schema[0] === 'pstring') {
           fieldCode += `size += ${compiler.callType(val, field.type)};\n`
         } else if (wireType === 2) {
           const dataSizeCode = compiler.callType(val, field.type)
@@ -91,7 +91,7 @@ function generateWrite (compiler, fields) {
       const processField = (val) => {
         let fieldCode = `offset = ${compiler.callType(tag, 'varint')};\n`
         const schema = compiler.types[field.type]
-        if (schema[0] === 'pstring') {
+        if (schema && schema[0] === 'pstring') {
           fieldCode += `offset = ${compiler.callType(val, field.type)};\n`
         } else if (wireType === 2) {
           const dataSizeCode = `ctx.sizeOfCtx['${field.type}'](${val})`
@@ -143,7 +143,7 @@ function generateRead (compiler, fields) {
       readCode += '  offset += fieldSize;\n'
       readCode += `  result.${field.name}.push(fieldValue);\n`
       readCode += '}\n'
-    } else if (schema[0] === 'pstring') {
+    } else if (schema && schema[0] === 'pstring') {
       readCode += `({ value: fieldValue, size: fieldSize } = ${compiler.callType(field.type, 'offset')});\n`
       readCode += 'offset += fieldSize;\n'
       if (field.repeated) {

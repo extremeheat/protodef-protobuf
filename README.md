@@ -3,91 +3,81 @@
 [![Build Status](https://github.com/extremeheat/protodef-protobuf/actions/workflows/ci.yml/badge.svg)](https://github.com/extremeheat/protodef-protobuf/actions/workflows/)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/extremeheat/protodef-protobuf)
 
-A powerful transpiler and runtime for using Google Protocol Buffers (`.proto` files) with the [node-protodef](https://github.com/ProtoDef-io/node-protodef) compiler.
+A transpiler and runtime for using Google Protocol Buffers (`.proto` files) with ProtoDef in Node.js via [node-protodef](https://github.com/ProtoDef-io/node-protodef) compiler.
 
-This library lets you define your protocol schemas in the industry-standard `.proto` format and seamlessly use them within the high-performance node-protodef ecosystem—perfect for custom network protocols, file parsers, and more.
+This allows you to read/write Protocol Buffer-encoded messages in your ProtoDef defined protocols without needing external parsing.
 
 ## Features
 
-- **Proto2 & Proto3 Support:** Transpiles schemas from both major versions of Protocol Buffers.
+- **Proto2 & Proto3 Support:** Supports both major versions of Protocol Buffers.
 - **Full Feature Set:** Handles nested messages, enums, maps, packed repeated fields, and extensions.
 - **High Performance:** Generates optimized JavaScript functions using protodef's AOT (Ahead-Of-Time) compiler.
 - **Flexible Framing:** Includes a `protobuf_message` container for easily length-prefixing your Protobuf messages, making them embeddable in any protocol.
-- **AST-based:** Works with the Abstract Syntax Tree from the `protocol-buffers-schema` package, allowing for powerful pre-processing and composition.
 
 ## Installation
 
 ```sh
-npm install protodef-protobuf protocol-buffers-schema protodef
+npm install protodef-protobuf protodef
 ```
 
 ## Usage
 
-The library consists of two main parts: a **transpiler** to convert your `.proto` schema into a protodef-compatible format, and a **custom datatype compiler** that teaches protodef how to read and write the Protobuf wire format.
+This library consists of 1. a transpiler to convert your `.proto` schema into ProtoDef JSON and 2. custom datatypes for node-protodef to work with the generated JSON schema.
 
 ### 1. Transpile Your Schema
 
 First, parse your `.proto` file(s) and pass the resulting AST to the transpiler:
 
 ```js
-const schemaParser = require('protocol-buffers-schema');
-const { transpileProtobufAST } = require('protodef-protobuf/transpiler');
-const fs = require('fs');
+const { ProtoDefCompiler } = require('protodef').Compiler
+const pp = require('protodef-protobuf');
 
-const protoFileContent = fs.readFileSync('my_protocol.proto', 'utf-8');
-const ast = schemaParser.parse(protoFileContent);
-const generatedSchema = transpileProtobufAST(ast);
+// Either import from a file like schema.proto or define inline:
+const schema = `
+  syntax = "proto3";
+  package chat;
+
+  message ChatMessage {
+    string user_id = 1;
+    string content = 2;
+  }
+`
+
+// If using extensions, you can push to the array with [base, extension1, ...] which'll be merged
+const generatedSchema = pp.transpile([schema])
 ```
 
-### 2. Define Your Protocol
+### 2. Define Your Protocol and Compile
 
-Create your main protocol definition. Typically, you'll wrap your Protobuf message in the `protobuf_message` container to handle framing:
+Create your main protocol definition. Typically, you'll wrap your Protobuf message in the `protobuf_message` container to handle framing (as Protocol Buffer messages do not have a length prefix by themselves):
 
 ```js
-const mainProtocol = {
-  // Define a top-level 'packet' type
-  packet: ['protobuf_message', {
-    lengthType: 'varint',           // The packet is prefixed with a varint length
-    type: 'my_package_MyMessage'    // The payload is our Protobuf message
+const assert = require('assert')
+
+const protocol = {
+  ...generatedSchema, // Include the generated schema
+  packet_hello: ['protobuf_message', {
+    lengthType: 'varint',           // The message is prefixed with a varint length
+    type: 'chat_ChatMessage'        // The payload is our Protobuf message
   }]
-};
-```
-
-### 3. Compile and Use
-
-Combine the generated schema and your main protocol, and pass them to the ProtoDefCompiler:
-
-```js
-const { ProtoDefCompiler } = require('protodef');
-const assert = require('assert');
-
-// Combine all schemas
-const fullSchema = { ...generatedSchema, ...mainProtocol };
-
-// Add a definition for the 'string' type used by protobuf
-fullSchema.string = ['pstring', { countType: 'varint' }];
+}
 
 // Create and configure the compiler
-const compiler = new ProtoDefCompiler();
-compiler.addTypes(require('protodef-protobuf/compiler')); // Add our custom types
-compiler.addTypesToCompile(fullSchema);
+const compiler = new ProtoDefCompiler()
+pp.addTypesToCompiler(compiler) // Add our custom types
+compiler.addTypesToCompile(protocol) // Add the generated schema
+const proto = compiler.compileProtoDefSync()
 
-// Compile the protocol
-const proto = compiler.compileProtoDefSync();
+const helloPacket = {
+  user_id: 'user123',
+  content: 'Hello, world!'
+}
 
-// --- You're ready to go! ---
+const encoded = proto.createPacketBuffer('packet_hello', helloPacket)
+console.log('Encoded Buffer:', encoded)
 
-const packetData = {
-  
-};
-
-// Serialize
-const buffer = proto.createPacketBuffer('packet', packetData);
-// Deserialize
-const result = proto.parsePacketBuffer('packet', buffer);
-
-assert.deepStrictEqual(packetData, result.data);
-console.log('Success!');
+const decoded = proto.parsePacketBuffer('packet_hello', encoded)
+assert.deepStrictEqual(decoded.data, helloPacket)
 ```
 
 ## API
