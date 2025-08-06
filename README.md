@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/extremeheat/protodef-protobuf/actions/workflows/ci.yml/badge.svg)](https://github.com/extremeheat/protodef-protobuf/actions/workflows/)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/extremeheat/protodef-protobuf)
 
-A transpiler and runtime for using Google Protocol Buffers (`.proto` files) with ProtoDef in Node.js via [node-protodef](https://github.com/ProtoDef-io/node-protodef) compiler.
+A transpiler and runtime for using Google Protocol Buffers (`.proto` files) with ProtoDef in Node.js via [node-protodef](https://github.com/ProtoDef-io/node-protodef) (supporting both interpreter and compiler).
 
 This allows you to read/write Protocol Buffer-encoded messages in your ProtoDef defined protocols without needing external parsing.
 
@@ -12,6 +12,7 @@ This allows you to read/write Protocol Buffer-encoded messages in your ProtoDef 
 - **Proto2 & Proto3 Support:** Supports both major versions of Protocol Buffers.
 - **Full Feature Set:** Handles nested messages, enums, maps, packed repeated fields, and extensions.
 - **High Performance:** Generates optimized JavaScript functions using protodef's AOT (Ahead-Of-Time) compiler.
+- **Runtime Flexibility:** Supports ProtoDef's interpreter mode on top of compiler for dynamic schemas.
 - **Flexible Framing:** Includes a `protobuf_message` container for easily length-prefixing your Protobuf messages, making them embeddable in any protocol.
 
 ## Installation
@@ -64,6 +65,8 @@ This library consists of two main components:
 
 1. **Transpiler**: Converts your `.proto` schemas into ProtoDef-compatible JSON
 2. **Runtime Types**: Custom ProtoDef types that handle Protobuf wire format encoding/decoding
+
+The library supports both **compiler mode** (for performance) and **interpreter mode** (for flexibility). See the [API documentation](docs/API.md) for detailed comparison.
 
 ### Detailed Usage
 
@@ -137,6 +140,7 @@ const decoded = proto.parsePacketBuffer('packet_hello', encoded)
 ## Examples
 
 - **[Basic Usage](examples/basic.js)** - Simple Proto3 message
+- **[Interpreter Mode](examples/interpreter.js)** - Using runtime flexibility  
 - **[Proto2 Extensions](examples/extensions.js)** - Working with extensions
 - **[Advanced Features](examples/advanced.js)** - Nested messages, enums, maps
 - **[Multiple Messages](examples/multiple-messages.js)** - Complete protocol example
