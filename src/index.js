@@ -21,7 +21,8 @@ function addTypesToCompiler (compiler) {
   // Ensure we have a string type...
   // TODO: we really should have our own string type to avoid collision with user-defined strings
   compiler.addTypesToCompile({
-    string: ['pstring', { countType: 'varint' }]
+    string: ['pstring', { countType: 'varint' }],
+    bool: 'native'
   })
   compiler.addTypes(compilerTypes)
 }

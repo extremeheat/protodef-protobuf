@@ -2,7 +2,7 @@ const assert = require('assert')
 const { ProtoDefCompiler } = require('protodef').Compiler
 const pp = require('protodef-protobuf')
 
-// Either import from a file like schema.proto or define inline:
+// Define a simple proto3 schema
 const schema = `
   syntax = "proto3";
   package chat;
@@ -13,9 +13,10 @@ const schema = `
   }
 `
 
-// If using extensions, you can push to the array with [base, extension1, ...] which'll be merged
+// Transpile the schema
 const generatedSchema = pp.transpile([schema])
 
+// Create a protocol that wraps the protobuf message with length framing
 const protocol = {
   ...generatedSchema, // Include the generated schema
   packet_hello: ['protobuf_message', {
@@ -23,8 +24,6 @@ const protocol = {
     type: 'chat_ChatMessage' // The payload is our Protobuf message
   }]
 }
-
-console.log('Generated Protocol Schema:', protocol)
 
 // Create and configure the compiler
 const compiler = new ProtoDefCompiler()
@@ -42,3 +41,5 @@ console.log('Encoded Buffer:', encoded)
 
 const decoded = proto.parsePacketBuffer('packet_hello', encoded)
 assert.deepStrictEqual(decoded.data, helloPacket)
+
+console.log('Success! The packet was encoded and decoded correctly.')

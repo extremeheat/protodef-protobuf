@@ -1,7 +1,7 @@
 {
   "name": "protodef-protobuf",
-  "version": "1.0.0",
-  "description": "A template repository to make it easy to create new prismarine repo",
+  "version": "0.0.1",
+  "description": "A transpiler and runtime for using Google Protocol Buffers (`.proto` files) with ProtoDef",
   "main": "src/index.js",
   "scripts": {
     "test": "mocha --reporter spec --exit",
