@@ -38,71 +38,55 @@ const PROTO_TO_PROTODEF_TYPE_MAP = {
   bytes: 'buffer'
 }
 
-function processNode (node, prefix, schema, rootAst) {
+function processFields (fields, message, prefix, rootAst) {
   const isProto3 = rootAst.syntax === 3
+  const protodefTypeName = `${prefix}${message.name}`
 
+  return fields.map(field => {
+    if (field.map) {
+      const keyType = PROTO_TO_PROTODEF_TYPE_MAP[field.map.from]
+      const valueType = PROTO_TO_PROTODEF_TYPE_MAP[field.map.to] || `${prefix}${field.map.to}`
+      const mapEntryName = `${protodefTypeName}_${field.name}_entry`
+      rootAst.messages.find(m => m.name === message.name).fields.find(f => f.name === field.name)
+      rootAst.schemas[mapEntryName] = ['protobuf_container', [
+        { name: 'key', type: keyType, tag: 1 },
+        { name: 'value', type: valueType, tag: 2 }
+      ]]
+      return { name: field.name, type: mapEntryName, tag: field.tag, repeated: true, map: true }
+    }
+
+    let fieldType = PROTO_TO_PROTODEF_TYPE_MAP[field.type]
+    if (!fieldType) {
+      const isNested = (message.messages && message.messages.some(m => m.name === field.type)) ||
+                       (message.enums && message.enums.some(e => e.name === field.type))
+      if (isNested) {
+        fieldType = `${protodefTypeName}_${field.type}`
+      } else {
+        const globalPrefix = rootAst.package ? rootAst.package.replace(/\./g, '_') + '_' : ''
+        fieldType = `${globalPrefix}${field.type}`
+      }
+    }
+
+    const fieldOptions = { name: field.name, type: fieldType, tag: field.tag, repeated: field.repeated }
+    if (isProto3) {
+      if (field.repeated && WIRE_TYPES[fieldType] !== 2) {
+        fieldOptions.packed = field.options.packed ? field.options.packed === 'true' : true
+      }
+    } else {
+      fieldOptions.required = field.required
+      fieldOptions.packed = field.options ? field.options.packed === 'true' : false
+    }
+    return fieldOptions
+  })
+}
+
+function processNode (node, prefix, schema, rootAst) {
   if (node.messages) {
     for (const message of node.messages) {
       const protodefTypeName = `${prefix}${message.name}`
       const messagePrefixForNesting = `${protodefTypeName}_`
-
-      const fields = message.fields.map(field => {
-        // Handle map fields by creating a synthetic message
-        if (field.map) {
-          const keyType = PROTO_TO_PROTODEF_TYPE_MAP[field.map.from]
-          const valueType = PROTO_TO_PROTODEF_TYPE_MAP[field.map.to] || `${prefix}${field.map.to}` // Handle nested message values
-          const mapEntryName = `${protodefTypeName}_${field.name}_entry`
-
-          // Define the synthetic key-value pair message for the map entry
-          schema[mapEntryName] = ['protobuf_container', [
-            { name: 'key', type: keyType, tag: 1 },
-            { name: 'value', type: valueType, tag: 2 }
-          ]]
-
-          return {
-            name: field.name,
-            type: mapEntryName,
-            tag: field.tag,
-            repeated: true, // Maps are always repeated fields
-            map: true // Add a flag for context
-          }
-        }
-
-        let fieldType = PROTO_TO_PROTODEF_TYPE_MAP[field.type]
-
-        if (!fieldType) {
-          const isNested = (message.messages && message.messages.some(m => m.name === field.type)) ||
-                           (message.enums && message.enums.some(e => e.name === field.type))
-
-          if (isNested) {
-            fieldType = `${protodefTypeName}_${field.type}`
-          } else {
-            const globalPrefix = rootAst.package ? rootAst.package.replace(/\./g, '_') + '_' : ''
-            fieldType = `${globalPrefix}${field.type}`
-          }
-        }
-
-        const fieldOptions = {
-          name: field.name,
-          type: fieldType,
-          tag: field.tag,
-          repeated: field.repeated
-        }
-
-        if (isProto3) {
-          // In proto3, repeated numeric fields are packed by default
-          if (field.repeated && WIRE_TYPES[fieldType] !== 2) {
-            fieldOptions.packed = field.options.packed ? field.options.packed === 'true' : true
-          }
-        } else {
-          // In proto2, handle explicit required/optional and packed
-          fieldOptions.required = field.required
-          fieldOptions.packed = field.options ? field.options.packed === 'true' : false
-        }
-
-        return fieldOptions
-      })
-
+      rootAst.schemas = schema
+      const fields = processFields(message.fields, message, prefix, rootAst)
       schema[protodefTypeName] = ['protobuf_container', fields]
       processNode(message, messagePrefixForNesting, schema, rootAst)
     }
@@ -125,7 +109,34 @@ function transpileProtobufAST (ast) {
   const protodefSchema = {}
   const packagePrefix = ast.package ? ast.package.replace(/\./g, '_') + '_' : ''
   processNode(ast, packagePrefix, protodefSchema, ast)
+
+  // After processing all base messages, process the extensions
+  if (ast.extends) {
+    for (const extension of ast.extends) {
+      const targetTypeName = `${packagePrefix}${extension.name}`
+      const targetSchema = protodefSchema[targetTypeName]
+      if (!targetSchema) {
+        console.warn(`Could not find message ${extension.name} to extend.`)
+        continue
+      }
+      const baseMessageNode = ast.messages.find(m => m.name === extension.name)
+      const extensionFields = processFields(extension.fields, baseMessageNode, packagePrefix, ast)
+      targetSchema[1].push(...extensionFields) // Push new fields into the container's field array
+    }
+  }
+
   return protodefSchema
 }
 
-module.exports = { transpileProtobufAST }
+function mergeAsts (asts) {
+  const finalAst = { syntax: 2, package: null, messages: [], enums: [], extends: [] }
+  for (const ast of asts) {
+    finalAst.messages.push(...ast.messages)
+    finalAst.enums.push(...ast.enums)
+    finalAst.extends.push(...ast.extends)
+    if (!finalAst.package && ast.package) finalAst.package = ast.package
+  }
+  return finalAst
+}
+
+module.exports = { transpileProtobufAST, mergeAsts }
