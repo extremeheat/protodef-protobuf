@@ -1,22 +1,9 @@
-// src/datatypes_compiler.js
+// src/datatypes/compiler.js
 /* eslint-disable camelcase, no-template-curly-in-string */
-// Implementation for the protobuf_container and protobuf_message compiler types
 
-const WIRE_TYPES = {
-  varint: 0,
-  zigzag32: 0,
-  zigzag64: 0,
-  varint64: 0,
-  bool: 0,
-  li64: 1,
-  lu64: 1,
-  lf64: 1,
-  string: 2,
-  buffer: 2,
-  li32: 5,
-  lu32: 5,
-  lf32: 5
-}
+const { WIRE_TYPES } = require('../util.js')
+
+// Implementation for the protobuf_container and protobuf_message compiler types
 
 function getWireType (compiler, type) {
   if (WIRE_TYPES[type] !== undefined) return WIRE_TYPES[type]
@@ -28,7 +15,7 @@ function getWireType (compiler, type) {
   throw new Error(`Could not determine wire type for ${type}`)
 }
 
-function generateSizeOf (compiler, fields) {
+function containerSizeOf (compiler, fields) {
   let code = 'let size = 0;\n'
   for (const field of fields) {
     const fieldVar = `value.${field.name}`
@@ -74,7 +61,7 @@ function generateSizeOf (compiler, fields) {
   return compiler.wrapCode(code)
 }
 
-function generateWrite (compiler, fields) {
+function containerWrite (compiler, fields) {
   let code = ''
   for (const field of fields) {
     const fieldVar = `value.${field.name}`
@@ -119,7 +106,7 @@ function generateWrite (compiler, fields) {
   return compiler.wrapCode(code)
 }
 
-function generateRead (compiler, fields) {
+function containerRead (compiler, fields) {
   let code = 'const result = {};\n'
   code += 'let fieldValue, fieldSize, len, lenSize;\n'
   code += 'const endOffset = size === undefined ? buffer.length : offset + size;\n'
@@ -238,15 +225,15 @@ const protobuf_message = {
 
 module.exports = {
   Read: {
-    protobuf_container: ['parametrizable', generateRead],
+    protobuf_container: ['parametrizable', containerRead],
     protobuf_message: protobuf_message.Read
   },
   Write: {
-    protobuf_container: ['parametrizable', generateWrite],
+    protobuf_container: ['parametrizable', containerWrite],
     protobuf_message: protobuf_message.Write
   },
   SizeOf: {
-    protobuf_container: ['parametrizable', generateSizeOf],
+    protobuf_container: ['parametrizable', containerSizeOf],
     protobuf_message: protobuf_message.SizeOf
   }
 }

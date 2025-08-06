@@ -72,7 +72,7 @@ const gameStateData = {
       inventory: ['rifle', 'pistol', 'grenade', 'armor']
     },
     {
-      id: 'player2', 
+      id: 'player2',
       score: 980,
       stats: [
         { key: 'kills', value: 12 },
@@ -111,7 +111,7 @@ assert.deepStrictEqual(decoded.data, gameStateData)
 console.log('\n✓ Success! Advanced Proto3 features work correctly:')
 console.log('  • Nested messages (Player, Settings)')
 console.log('  • Enums (Status)')
-console.log('  • Maps (stats, metadata)')  
+console.log('  • Maps (stats, metadata)')
 console.log('  • Repeated fields (players, inventory, recent_scores)')
 console.log('  • Packed repeated fields (recent_scores)')
 console.log('  • Mixed data types (strings, ints, floats, booleans)')

@@ -1,44 +1,7 @@
 // src/transpiler.js
 /* eslint-disable camelcase, no-template-curly-in-string */
 
-const WIRE_TYPES = {
-  varint: 0,
-  varint64: 0, // Add varint64
-  zigzag32: 0,
-  zigzag64: 0,
-  li64: 1,
-  lu64: 1,
-  lf64: 1,
-  string: 2,
-  buffer: 2,
-  li32: 5,
-  lu32: 5,
-  lf32: 5
-}
-
-const PROTO_TO_PROTODEF_TYPE_MAP = {
-  int32: 'varint',
-  uint32: 'varint',
-  // FIX: Map 64-bit integers to the correct varint64 type
-  int64: 'varint64',
-  uint64: 'varint64',
-  bool: 'bool',
-  enum: 'varint',
-  // ZigZag VarInt
-  sint32: 'zigzag32',
-  sint64: 'zigzag64',
-  // 32-bit Little-Endian
-  fixed32: 'lu32',
-  sfixed32: 'li32',
-  float: 'lf32',
-  // 64-bit Little-Endian
-  fixed64: 'lu64',
-  sfixed64: 'li64',
-  double: 'lf64',
-  // Length-Delimited
-  string: 'string',
-  bytes: 'buffer'
-}
+const { WIRE_TYPES, PROTO_TO_PROTODEF_TYPE_MAP } = require('./util')
 
 function processFields (fields, message, prefix, rootAst, schema) {
   const isProto3 = rootAst.syntax === 3

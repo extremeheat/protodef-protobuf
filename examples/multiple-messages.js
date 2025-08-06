@@ -51,23 +51,23 @@ console.log('Generated message types:', Object.keys(generatedSchema).filter(k =>
 // Create a protocol with multiple packet types
 const protocol = {
   ...generatedSchema,
-  
+
   // Different packet types using the same protobuf_message container
   login_request: ['protobuf_message', {
     lengthType: 'varint',
     type: 'protocol_LoginRequest'
   }],
-  
+
   login_response: ['protobuf_message', {
-    lengthType: 'varint', 
+    lengthType: 'varint',
     type: 'protocol_LoginResponse'
   }],
-  
+
   chat_message: ['protobuf_message', {
     lengthType: 'varint',
     type: 'protocol_ChatMessage'
   }],
-  
+
   player_update: ['protobuf_message', {
     lengthType: 'varint',
     type: 'protocol_PlayerUpdate'
@@ -86,7 +86,7 @@ console.log('Testing multiple message types...\n')
 // 1. Login Request
 const loginReq = {
   username: 'testuser',
-  password: 'secret123', 
+  password: 'secret123',
   client_version: '1.0.0'
 }
 
@@ -95,7 +95,7 @@ const loginReqDecoded = proto.parsePacketBuffer('login_request', loginReqEncoded
 assert.deepStrictEqual(loginReqDecoded.data, loginReq)
 console.log('✓ LoginRequest:', loginReq)
 
-// 2. Login Response  
+// 2. Login Response
 const loginResp = {
   status: 'SUCCESS',
   session_token: 'abc123def456',

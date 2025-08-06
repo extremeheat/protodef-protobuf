@@ -15,7 +15,7 @@ const assert = require('assert')
 function createProtoDef (generatedSchema) {
   generatedSchema.string = ['pstring', { countType: 'varint' }]
   const compiler = new ProtoDefCompiler()
-  compiler.addTypes(require('../src/datatypes_compiler.js'))
+  compiler.addTypes(require('../src/datatypes/compiler.js'))
   compiler.addTypesToCompile(generatedSchema)
   const proto = compiler.compileProtoDefSync()
   proto.writeCtx.sizeOfCtx = proto.sizeOfCtx

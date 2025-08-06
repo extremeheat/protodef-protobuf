@@ -1,6 +1,6 @@
 const schemaParser = require('protocol-buffers-schema')
 const { transpileProtobufAST, mergeAsts } = require('./transpiler.js')
-const compilerTypes = require('./datatypes_compiler.js')
+const compilerTypes = require('./datatypes/compiler.js')
 
 /**
  * A higher-level wrapper that parses and transpiles an array of .proto schema strings.
@@ -32,5 +32,5 @@ module.exports = {
   addTypesToCompiler,
   // Expose lower-level modules for advanced use
   transpiler: require('./transpiler.js'),
-  compiler: require('./datatypes_compiler.js')
+  compiler: require('./datatypes/compiler.js')
 }
