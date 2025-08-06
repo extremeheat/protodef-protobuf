@@ -14,6 +14,7 @@ const assert = require('assert')
 
 function createProtoDef (generatedSchema) {
   generatedSchema.protobuf_string = ['pstring', { countType: 'varint' }]
+  generatedSchema.protobuf_bytes = ['buffer', { countType: 'varint' }]
   const compiler = new ProtoDefCompiler()
   compiler.addTypes(require('../src/datatypes/compiler.js'))
   compiler.addTypesToCompile(generatedSchema)
@@ -274,6 +275,96 @@ describe('protodef-protobuf', () => {
       assert(pp.compiler, 'Should expose compiler module')
       assert(typeof pp.transpiler.transpileProtobufAST === 'function', 'Should expose transpileProtobufAST function')
       assert(typeof pp.transpiler.mergeAsts === 'function', 'Should expose mergeAsts function')
+    })
+  })
+
+  describe('Bytes Field Test', () => {
+    it('should handle protobuf bytes fields correctly', () => {
+      const pp = require('../src/index.js')
+
+      // Test schema with bytes fields
+      const schema = `
+        syntax = "proto3";
+        package test;
+
+        message BinaryMessage {
+          int32 id = 1;
+          bytes data = 2;
+          repeated bytes chunks = 3;
+        }
+      `
+
+      // Transpile using the public API
+      const generatedSchema = pp.transpile([schema])
+
+      // Verify the generated schema contains protobuf_bytes
+      assert(generatedSchema.test_BinaryMessage, 'Generated schema should contain test_BinaryMessage type')
+
+      // Create protocol
+      const protocol = {
+        ...generatedSchema,
+        binary_packet: ['protobuf_message', {
+          lengthType: 'varint',
+          type: 'test_BinaryMessage'
+        }]
+      }
+
+      // Set up compiler
+      const compiler = new ProtoDefCompiler()
+      pp.addTypesToCompiler(compiler)
+      compiler.addTypesToCompile(protocol)
+      const proto = compiler.compileProtoDefSync()
+
+      // Test data with binary data
+      const binaryData = {
+        id: 42,
+        data: Buffer.from([0x01, 0x02, 0x03, 0x04, 0xFF]),
+        chunks: [
+          Buffer.from([0xDE, 0xAD]),
+          Buffer.from([0xBE, 0xEF]),
+          Buffer.from([0xCA, 0xFE, 0xBA, 0xBE])
+        ]
+      }
+
+      // Test round-trip
+      const encoded = proto.createPacketBuffer('binary_packet', binaryData)
+      assert(Buffer.isBuffer(encoded), 'Should return a buffer')
+      assert(encoded.length > 0, 'Buffer should not be empty')
+
+      const decoded = proto.parsePacketBuffer('binary_packet', encoded)
+      assert.deepStrictEqual(decoded.data, binaryData, 'Binary data should match after round-trip')
+    })
+
+    it('should handle bytes fields with interpreter', () => {
+      const pp = require('../src/index.js')
+      const { ProtoDef } = require('protodef')
+
+      // Test schema with bytes field
+      const schema = `
+        syntax = "proto3";
+        package test;
+
+        message SimpleBytes {
+          bytes content = 1;
+        }
+      `
+
+      // Transpile and set up interpreter
+      const generatedSchema = pp.transpile([schema])
+      const protodef = new ProtoDef()
+      pp.addTypesToInterpreter(protodef)
+      protodef.addTypes(generatedSchema)
+
+      // Test data
+      const testData = {
+        content: Buffer.from('Hello, binary world!', 'utf8')
+      }
+
+      // Test round-trip with interpreter
+      const encoded = protodef.createPacketBuffer('test_SimpleBytes', testData)
+      const decoded = protodef.parsePacketBuffer('test_SimpleBytes', encoded)
+
+      assert.deepStrictEqual(decoded.data, testData, 'Interpreter should handle bytes correctly')
     })
   })
 })

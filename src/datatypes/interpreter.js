@@ -70,9 +70,9 @@ function readProtobufContainer (buffer, offset, typeArgs, context, size) {
       fieldSize = 0 // currentOffset already advanced during packed reading
     } else if (wireType === 2) {
       // Length-delimited fields (strings, bytes, nested messages)
-      const isPstringLike = field.type === 'protobuf_string' // String fields use pstring encoding
-      if (isPstringLike) {
-        // pstring-like fields handle their own length prefix
+      const isLengthPrefixed = field.type === 'protobuf_string' || field.type === 'protobuf_bytes'
+      if (isLengthPrefixed) {
+        // Types that handle their own length prefix (pstring, buffer with countType)
         const readResult = this.read(buffer, currentOffset, field.type, result)
         fieldValue = readResult.value
         fieldSize = readResult.size
@@ -147,9 +147,9 @@ function writeProtobufContainer (value, buffer, offset, typeArgs, context) {
         } else {
           // Write each element as a separate field
           for (const item of fieldValue) {
-            const isPstringLike = field.type === 'protobuf_string' // String fields use pstring encoding
-            if (isPstringLike) {
-              // pstring-like fields handle their own wire format
+            const isLengthPrefixed = field.type === 'protobuf_string' || field.type === 'protobuf_bytes'
+            if (isLengthPrefixed) {
+              // Types that handle their own length prefix
               const tag = (field.tag << 3) | 2
               currentOffset = this.write(tag, buffer, currentOffset, 'varint', value)
               currentOffset = this.write(item, buffer, currentOffset, field.type, value)
@@ -171,10 +171,10 @@ function writeProtobufContainer (value, buffer, offset, typeArgs, context) {
       }
     } else {
       // Handle singular fields
-      const isPstringLike = field.type === 'protobuf_string' // String fields use pstring encoding
-      if (isPstringLike) {
-        // pstring-like fields handle their own wire format (tag + length + data)
-        const tag = (field.tag << 3) | 2 // pstring is always wire type 2
+      const isLengthPrefixed = field.type === 'protobuf_string' || field.type === 'protobuf_bytes'
+      if (isLengthPrefixed) {
+        // Types that handle their own length prefix (tag + length + data)
+        const tag = (field.tag << 3) | 2 // Always wire type 2
         currentOffset = this.write(tag, buffer, currentOffset, 'varint', value)
         currentOffset = this.write(fieldValue, buffer, currentOffset, field.type, value)
       } else {
@@ -230,9 +230,9 @@ function sizeOfProtobufContainer (value, typeArgs, context) {
         } else {
           // Calculate size of each element as a separate field
           for (const item of fieldValue) {
-            const isPstringLike = field.type === 'protobuf_string' // String fields use pstring encoding
-            if (isPstringLike) {
-              // pstring-like fields handle their own wire format
+            const isLengthPrefixed = field.type === 'protobuf_string' || field.type === 'protobuf_bytes'
+            if (isLengthPrefixed) {
+              // Types that handle their own length prefix
               const tag = (field.tag << 3) | 2
               totalSize += this.sizeOf(tag, 'varint', value)
               totalSize += this.sizeOf(item, field.type, value)
@@ -254,9 +254,9 @@ function sizeOfProtobufContainer (value, typeArgs, context) {
       }
     } else {
       // Handle singular fields
-      const isPstringLike = field.type === 'protobuf_string' // String fields use pstring encoding
-      if (isPstringLike) {
-        // pstring-like fields handle their own wire format
+      const isLengthPrefixed = field.type === 'protobuf_string' || field.type === 'protobuf_bytes'
+      if (isLengthPrefixed) {
+        // Types that handle their own length prefix
         const tag = (field.tag << 3) | 2
         totalSize += this.sizeOf(tag, 'varint', value)
         totalSize += this.sizeOf(fieldValue, field.type, value)
@@ -336,5 +336,6 @@ function sizeOfProtobufMessage (value, typeArgs, context) {
 module.exports = {
   protobuf_container: [readProtobufContainer, writeProtobufContainer, sizeOfProtobufContainer],
   protobuf_message: [readProtobufMessage, writeProtobufMessage, sizeOfProtobufMessage],
-  protobuf_string: ['pstring', { countType: 'varint' }]
+  protobuf_string: ['pstring', { countType: 'varint' }],
+  protobuf_bytes: ['buffer', { countType: 'varint' }]
 }

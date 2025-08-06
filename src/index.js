@@ -22,7 +22,8 @@ function addTypesToCompiler (compiler) {
   compiler.addTypes(compilerTypes)
   // Add type aliases that the transpiler generates
   compiler.addTypesToCompile({
-    protobuf_string: ['pstring', { countType: 'varint' }]
+    protobuf_string: ['pstring', { countType: 'varint' }],
+    protobuf_bytes: ['buffer', { countType: 'varint' }]
   })
 }
 

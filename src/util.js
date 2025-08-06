@@ -8,7 +8,7 @@ const WIRE_TYPES = {
   lu64: 1,
   lf64: 1,
   protobuf_string: 2,
-  buffer: 2,
+  protobuf_bytes: 2,
   li32: 5,
   lu32: 5,
   lf32: 5
@@ -34,7 +34,7 @@ const PROTO_TO_PROTODEF_TYPE_MAP = {
   double: 'lf64',
   // Length-Delimited
   string: 'protobuf_string',
-  bytes: 'buffer'
+  bytes: 'protobuf_bytes'
 }
 
 module.exports = {
