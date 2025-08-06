@@ -1,9 +1,10 @@
 // TODO: Monkey patch: Wait for this to be merged upstream
-const { CompiledProtodef } = require('protodef/src/compiler')
-const original = CompiledProtodef.prototype.compileProtoDefSync
-CompiledProtodef.prototype.compileProtoDefSync = function () {
-  this.setVariable('sizeOfCtx', this.sizeOfCtx)
-  return original.call(this)
+const { ProtoDefCompiler } = require('protodef/src/compiler')
+const original = ProtoDefCompiler.prototype.compileProtoDefSync
+ProtoDefCompiler.prototype.compileProtoDefSync = function () {
+  const compiled = original.call(this)
+  compiled.setVariable('sizeOfCtx', compiled.sizeOfCtx)
+  return compiled
 }
 
 const schemaParser = require('protocol-buffers-schema')
