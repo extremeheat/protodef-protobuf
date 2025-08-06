@@ -3,12 +3,23 @@
  * * This file tests the entire pipeline with multiple scenarios:
  * 1. A comprehensive proto2 test with all major features.
  * 2. A realistic proto3 test using the new 'protobuf_message' type.
+ * 3. A proto2 test demonstrating support for extensions.
  */
 
 const schemaParser = require('protocol-buffers-schema')
 const { ProtoDef, Compiler: { ProtoDefCompiler } } = require('protodef')
-const { transpileProtobufAST } = require('./transpiler.js')
+const { transpileProtobufAST, mergeAsts } = require('./transpiler.js')
 const assert = require('assert')
+
+function createProtoDef (generatedSchema) {
+  generatedSchema.string = ['pstring', { countType: 'varint' }]
+  const compiler = new ProtoDefCompiler()
+  compiler.addTypes(require('./datatypes_compiler.js'))
+  compiler.addTypesToCompile(generatedSchema)
+  const proto = compiler.compileProtoDefSync()
+  proto.writeCtx.sizeOfCtx = proto.sizeOfCtx
+  return proto
+}
 
 // --- Test Case 1: Comprehensive Proto2 Schema ---
 const proto2Content = `
@@ -42,13 +53,7 @@ async function runProto2Test () {
   console.log('--- Running Proto2 Comprehensive Test ---')
   const ast = schemaParser.parse(proto2Content)
   const generatedSchema = transpileProtobufAST(ast)
-  generatedSchema.string = ['pstring', { countType: 'varint' }]
-
-  const compiler = new ProtoDefCompiler()
-  compiler.addTypes(require('./datatypes_compiler.js'))
-  compiler.addTypesToCompile(generatedSchema)
-  const proto = compiler.compileProtoDefSync()
-  proto.writeCtx.sizeOfCtx = proto.sizeOfCtx
+  const proto = createProtoDef(generatedSchema)
 
   const mainType = 'my_game_Player'
   const packetData = {
@@ -93,7 +98,6 @@ async function runEncapsulatedProto3Test () {
   console.log('--- Running Encapsulated Proto3 Test ---')
   const ast = schemaParser.parse(proto3Content)
   const generatedSchema = transpileProtobufAST(ast)
-  generatedSchema.string = ['pstring', { countType: 'varint' }]
 
   // Our main protocol now uses the new 'protobuf_message' type
   const mainProtocol = {
@@ -103,13 +107,7 @@ async function runEncapsulatedProto3Test () {
     }]
   }
 
-  const compiler = new ProtoDefCompiler()
-  compiler.addTypes(require('./datatypes_compiler.js'))
-  compiler.addTypesToCompile(generatedSchema)
-  compiler.addTypesToCompile(mainProtocol)
-
-  const proto = compiler.compileProtoDefSync()
-  proto.writeCtx.sizeOfCtx = proto.sizeOfCtx
+  const proto = createProtoDef({ ...generatedSchema, ...mainProtocol })
 
   const mainType = 'packet'
   const packetData = {
@@ -128,10 +126,55 @@ async function runEncapsulatedProto3Test () {
   }
 }
 
-// Run both tests
+// --- Test Case 3: Proto2 Extensions ---
+async function runExtensionTest () {
+  console.log('--- Running Proto2 Extensions Test ---')
+  const baseContent = `
+    syntax = "proto2";
+    package my.game;
+
+    message Player {
+      extensions 100 to 199;
+      required int32 id = 1;
+    }
+  `
+  const extContent = `
+    syntax = "proto2";
+    package my.game;
+
+    extend Player {
+      optional string name = 100;
+    }
+  `
+  const baseAst = schemaParser.parse(baseContent)
+  const extAst = schemaParser.parse(extContent)
+  const mergedAst = mergeAsts([baseAst, extAst])
+  console.log('Merged AST:', JSON.stringify(mergedAst))
+  const generatedSchema = transpileProtobufAST(mergedAst)
+  const proto = createProtoDef(generatedSchema)
+
+  const mainType = 'my_game_Player'
+  const packetData = {
+    id: 456,
+    name: 'ExtendedPlayer'
+  }
+
+  try {
+    const buffer = proto.createPacketBuffer(mainType, packetData)
+    const result = proto.parsePacketBuffer(mainType, buffer)
+    assert.deepStrictEqual(packetData, result.data, 'Proto2 extensions data does not match!')
+    console.log('SUCCESS: Proto2 extensions test passed.\n')
+  } catch (e) {
+    console.error('\nERROR in Proto2 extensions test:', e.message)
+    console.log(e)
+  }
+}
+
+// Run all tests
 async function runAllTests () {
   await runProto2Test()
   await runEncapsulatedProto3Test()
+  await runExtensionTest()
   console.log('--- All Tests Complete ---')
 }
 

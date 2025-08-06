@@ -38,7 +38,7 @@ const PROTO_TO_PROTODEF_TYPE_MAP = {
   bytes: 'buffer'
 }
 
-function processFields (fields, message, prefix, rootAst) {
+function processFields (fields, message, prefix, rootAst, schema) {
   const isProto3 = rootAst.syntax === 3
   const protodefTypeName = `${prefix}${message.name}`
 
@@ -47,8 +47,7 @@ function processFields (fields, message, prefix, rootAst) {
       const keyType = PROTO_TO_PROTODEF_TYPE_MAP[field.map.from]
       const valueType = PROTO_TO_PROTODEF_TYPE_MAP[field.map.to] || `${prefix}${field.map.to}`
       const mapEntryName = `${protodefTypeName}_${field.name}_entry`
-      rootAst.messages.find(m => m.name === message.name).fields.find(f => f.name === field.name)
-      rootAst.schemas[mapEntryName] = ['protobuf_container', [
+      schema[mapEntryName] = ['protobuf_container', [
         { name: 'key', type: keyType, tag: 1 },
         { name: 'value', type: valueType, tag: 2 }
       ]]
@@ -85,8 +84,7 @@ function processNode (node, prefix, schema, rootAst) {
     for (const message of node.messages) {
       const protodefTypeName = `${prefix}${message.name}`
       const messagePrefixForNesting = `${protodefTypeName}_`
-      rootAst.schemas = schema
-      const fields = processFields(message.fields, message, prefix, rootAst)
+      const fields = processFields(message.fields, message, prefix, rootAst, schema)
       schema[protodefTypeName] = ['protobuf_container', fields]
       processNode(message, messagePrefixForNesting, schema, rootAst)
     }
@@ -120,7 +118,8 @@ function transpileProtobufAST (ast) {
         continue
       }
       const baseMessageNode = ast.messages.find(m => m.name === extension.name)
-      const extensionFields = processFields(extension.fields, baseMessageNode, packagePrefix, ast)
+      // FIX: The parser places extension fields in 'extension.message.fields'
+      const extensionFields = processFields(extension.message.fields, baseMessageNode, packagePrefix, ast, protodefSchema)
       targetSchema[1].push(...extensionFields) // Push new fields into the container's field array
     }
   }
