@@ -1,154 +1,292 @@
 # API Reference
 
-This document provides a detailed API for the **protodef-protobuf** library, with a focus on practical, real-world examples.
+This document provides a detailed API reference for **protodef-protobuf**, with practical examples and common usage patterns.
+
+## Table of Contents
+
+- [Main API Functions](#main-api-functions)
+  - [`transpile()`](#transpileschemas)
+  - [`addTypesToCompiler()`](#addtypestocompilercompiler)
+- [Custom ProtoDef Types](#custom-protodef-types)
+  - [`protobuf_message`](#protobuf_message)
+  - [`protobuf_container`](#protobuf_container)
+- [Usage Patterns](#usage-patterns)
+- [Examples](#examples)
 
 ---
 
-## Top-Level API (`protodef-protobuf`)
+## Main API Functions
 
-These are the main helper functions you will use in your project.
+These are the primary functions you'll use to integrate Protocol Buffers with ProtoDef.
 
 ---
 
 ### `transpile(schemas)`
 
-Parses and transpiles an array of `.proto` schema strings into a single protodef JSON schema.
+Converts Protocol Buffer `.proto` schemas into ProtoDef-compatible JSON format.
 
-- **schemas** `<Array<String>>`: An array of strings, where each string is the content of a `.proto` file.
-- **Returns** `<Object>`: The protodef-compatible JSON schema.
+**Parameters:**
+- `schemas` **Array<String>** - Array of `.proto` file contents as strings
 
-#### How to Use It
+**Returns:**
+- **Object** - ProtoDef JSON schema containing all message types
 
-This is the primary function for converting your schemas. It automatically handles parsing and merging multiple files, which is essential for using extensions.
-
+**Example:**
 ```js
-const pp = require('protodef-protobuf');
+const pp = require('protodef-protobuf')
 
-const baseSchema = `
-  syntax = "proto2";
-  package my.game;
-  message Player { extensions 100 to 199; required int32 id = 1; }
-`;
-const extSchema = `
-  syntax = "proto2";
-  package my.game;
-  extend Player { optional string username = 100; }
-`;
+const schema = `
+  syntax = "proto3";
+  package example;
+  message User {
+    string name = 1;
+    int32 age = 2;
+  }
+`
 
-// Pass an array of schema strings
-const generatedSchema = pp.transpile([baseSchema, extSchema]);
-
-console.log(generatedSchema);
-/*
-Output:
-{
-  my_game_Player: [
-    'protobuf_container',
-    [
-      { name: 'id', type: 'varint', tag: 1, ... },
-      { name: 'username', type: 'string', tag: 100, ... }
-    ]
-  ]
-}
-*/
+const result = pp.transpile([schema])
+console.log(result)
+// Output: { example_User: ['protobuf_container', [...]] }
 ```
 
----
+**With Multiple Schemas (Extensions):**
+```js
+const base = `
+  syntax = "proto2";
+  package game;
+  message Player {
+    extensions 100 to 199;
+    required int32 id = 1;
+  }
+`
+
+const extension = `
+  syntax = "proto2";
+  package game;
+  extend Player {
+    optional string username = 100;
+  }
+`
+
+const merged = pp.transpile([base, extension])
+// Automatically merges the extension into the Player message
+```
 
 ### `addTypesToCompiler(compiler)`
 
-A helper function that adds all the custom Protobuf types (`protobuf_container`, `protobuf_message`) to a `ProtoDefCompiler` instance.
+Registers all custom Protobuf types with a ProtoDef compiler instance.
 
-- **compiler** `<Object>`: An instance of `ProtoDefCompiler`.
+**Parameters:**
+- `compiler` **ProtoDefCompiler** - Instance of ProtoDef compiler
 
-#### How to Use It
+**Returns:**
+- **void**
 
-Call this once during your setup to teach the compiler how to handle the Protobuf types.
-
+**Example:**
 ```js
-const { ProtoDefCompiler } = require('protodef').Compiler;
-const pp = require('protodef-protobuf');
+const { ProtoDefCompiler } = require('protodef').Compiler
+const pp = require('protodef-protobuf')
 
-const compiler = new ProtoDefCompiler();
-pp.addTypesToCompiler(compiler); // Adds the necessary runtime logic
+const compiler = new ProtoDefCompiler()
+pp.addTypesToCompiler(compiler)  // Adds protobuf_message, protobuf_container, etc.
 
-// ... now you can add your generated schemas
+// Now you can compile schemas that use Protobuf types
+compiler.addTypesToCompile({
+  my_packet: ['protobuf_message', { /* ... */ }]
+})
 ```
 
 ---
 
-## Custom Protodef Types
+## Custom ProtoDef Types
 
-These are the custom parametrizable types that provide the runtime logic. You will use `protobuf_message` in your own protocol definitions.
+These types are automatically registered when you call `addTypesToCompiler()`. You'll primarily use `protobuf_message` in your schemas.
 
 ---
 
 ### `protobuf_message`
 
-A container that frames a Protobuf message, usually with a length prefix. This is essential for embedding Protobuf messages in a stream or alongside other data.
+A container type that frames Protobuf messages, typically with a length prefix. Essential for embedding Protobuf messages in streams or mixed protocols.
 
-**Schema:** `['protobuf_message', { options }]`
-
-#### Options
-
-- **type** `<String>` (Required): The name of the `protobuf_container` to encapsulate.
-- **lengthType** `<String>` (Optional): A protodef type (e.g., `'varint'`, `'u16'`) for a length prefix that is read from/written to the stream.
-- **length** `<String>` (Optional): The path to a variable in the context that contains the length of the message.
-
-> You must provide either `lengthType` or `length`.
-
-#### How to Use It
-
-**Example 1: Simple Length Prefix (`lengthType`)**
-
-This is the most common use case for framing a single message.
-
+**Schema Format:**
 ```js
-// Your protodef schema
-const protocol = {
-  packet: ['protobuf_message', {
-    lengthType: 'varint',
-    type: 'my_package_MyMessage'
-  }]
-};
-
-// Serializes to: [varint length of MyMessage][...bytes of MyMessage...]
+['protobuf_message', {
+  type: 'message_type_name',    // Required: Protobuf message type
+  lengthType: 'varint',         // Optional: Length prefix type  
+  length: 'path.to.length'      // Optional: Context path to length
+}]
 ```
 
-**Example 2: Length from Another Field (`length`)**
+**Parameters:**
+- `type` **String** *(required)* - Name of the protobuf_container type to wrap
+- `lengthType` **String** *(optional)* - ProtoDef type for length prefix (`'varint'`, `'u16'`, etc.)
+- `length` **String** *(optional)* - Context path to length value
 
-This is for complex protocols where a header defines the payload length.
+> **Note:** You must specify either `lengthType` OR `length`, not both.
 
+#### Common Patterns
+
+**Pattern 1: Simple Length Prefix**
 ```js
-// Your protodef schema
+const protocol = {
+  ...generatedSchema,
+  chat_packet: ['protobuf_message', {
+    lengthType: 'varint',           // Varint length prefix
+    type: 'chat_ChatMessage'        // Your message type
+  }]
+}
+
+// Wire format: [varint:length][protobuf data...]
+```
+
+**Pattern 2: Pre-determined Length**
+```js
 const protocol = {
   packet: ['container', [
-    { name: 'header', type: 'packet_header' },
-    {
-      name: 'payload',
-      type: ['protobuf_message', {
-        length: 'header.payloadLength', // Use the value from the header
-        type: 'my_package_MyMessage'
-      }]
-    }
-  ]],
-
-  packet_header: ['container', [
-    { name: 'packetId', type: 'u8' },
-    { name: 'payloadLength', type: 'u16' }
+    { name: 'header', type: ['container', [
+      { name: 'type', type: 'u8' },
+      { name: 'payloadSize', type: 'u16' }
+    ]]},
+    { name: 'payload', type: ['protobuf_message', {
+      length: 'header.payloadSize',   // Use header field
+      type: 'game_PlayerUpdate'
+    }]}
   ]]
-};
+}
 
-// Serializes to: [1 byte packetId][2 bytes payloadLength][...payloadLength bytes of MyMessage...]
+// Wire format: [u8:type][u16:size][protobuf data...]
 ```
 
----
+**Pattern 3: Multiple Message Types**
+```js
+const protocol = {
+  ...generatedSchema,
+  
+  login_packet: ['protobuf_message', {
+    lengthType: 'varint',
+    type: 'auth_LoginRequest'
+  }],
+  
+  chat_packet: ['protobuf_message', {
+    lengthType: 'varint', 
+    type: 'chat_ChatMessage'
+  }],
+  
+  game_packet: ['protobuf_message', {
+    lengthType: 'varint',
+    type: 'game_PlayerUpdate'  
+  }]
+}
+```
 
 ### `protobuf_container`
 
-The core type that reads and writes the fields of a Protobuf message. The transpiler generates this for you, so you will **not** use it directly in your schemas.
+The core type that handles the actual Protobuf wire format encoding/decoding. This is generated automatically by the transpiler - **you don't use this directly**.
+
+**Generated by:** The `transpile()` function creates these for each message in your schema.
+
+**Internal Usage:**
+```js
+// This is what the transpiler generates:
+{
+  example_User: ['protobuf_container', [
+    { name: 'name', type: 'string', tag: 1 },
+    { name: 'age', type: 'varint', tag: 2 }
+  ]]
+}
+```
 
 ---
 
-## Usage Examples
-* [Basic Example](../examples/basic.js)
+## Usage Patterns
+
+### Complete Setup Example
+
+```js
+const { ProtoDefCompiler } = require('protodef').Compiler
+const pp = require('protodef-protobuf')
+
+// 1. Define your schemas
+const schemas = [`
+  syntax = "proto3";
+  package app;
+  message User {
+    string name = 1;
+    int32 age = 2;
+  }
+`]
+
+// 2. Transpile
+const generatedSchema = pp.transpile(schemas)
+
+// 3. Create protocol
+const protocol = {
+  ...generatedSchema,
+  user_packet: ['protobuf_message', {
+    lengthType: 'varint',
+    type: 'app_User'
+  }]
+}
+
+// 4. Setup compiler
+const compiler = new ProtoDefCompiler()
+pp.addTypesToCompiler(compiler)
+compiler.addTypesToCompile(protocol)
+const proto = compiler.compileProtoDefSync()
+
+// 5. Use it!
+const userData = { name: 'Alice', age: 30 }
+const encoded = proto.createPacketBuffer('user_packet', userData)
+const decoded = proto.parsePacketBuffer('user_packet', encoded)
+```
+
+### Working with File-based Schemas
+
+```js
+const fs = require('fs')
+const pp = require('protodef-protobuf')
+
+// Load multiple .proto files
+const baseSchema = fs.readFileSync('schemas/base.proto', 'utf8')
+const userSchema = fs.readFileSync('schemas/user.proto', 'utf8') 
+const gameSchema = fs.readFileSync('schemas/game.proto', 'utf8')
+
+// Transpile all together
+const generatedSchema = pp.transpile([baseSchema, userSchema, gameSchema])
+```
+
+### Advanced Protocol Design
+
+```js
+const protocol = {
+  ...generatedSchema,
+  
+  // Packet with header + protobuf payload
+  game_packet: ['container', [
+    { name: 'header', type: ['container', [
+      { name: 'packetType', type: 'u8' },
+      { name: 'payloadSize', type: 'u16' },
+      { name: 'timestamp', type: 'u32' }
+    ]]},
+    { name: 'payload', type: ['protobuf_message', {
+      length: 'header.payloadSize',
+      type: 'game_PlayerAction'  
+    }]}
+  ]],
+  
+  // Simple framed message
+  chat_packet: ['protobuf_message', {
+    lengthType: 'varint',
+    type: 'chat_Message'
+  }]
+}
+```
+
+---
+
+## Examples
+
+- **[Basic Usage](../examples/basic.js)** - Simple Proto3 message encoding/decoding
+- **[Proto2 Extensions](../examples/extensions.js)** - Working with Proto2 extensions  
+- **[Advanced Features](../examples/advanced.js)** - Nested messages, enums, maps
+- **[Multiple Messages](../examples/multiple-messages.js)** - Complete protocol with multiple message types

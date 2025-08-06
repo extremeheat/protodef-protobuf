@@ -20,70 +20,150 @@ This allows you to read/write Protocol Buffer-encoded messages in your ProtoDef 
 npm install protodef-protobuf protodef
 ```
 
-## Usage
-
-This library consists of 1. a transpiler to convert your `.proto` schema into ProtoDef JSON and 2. custom datatypes for node-protodef to work with the generated JSON schema.
-
-### 1. Transpile Your Schema
-
-First, parse your `.proto` file(s) and pass the resulting AST to the transpiler:
+## Quick Start
 
 ```js
 const { ProtoDefCompiler } = require('protodef').Compiler
-const pp = require('protodef-protobuf');
+const pp = require('protodef-protobuf')
 
-// Either import from a file like schema.proto or define inline:
+// 1. Define your .proto schema
 const schema = `
   syntax = "proto3";
   package chat;
-
   message ChatMessage {
     string user_id = 1;
     string content = 2;
   }
 `
 
-// If using extensions, you can push to the array with [base, extension1, ...] which'll be merged
+// 2. Transpile and create protocol
 const generatedSchema = pp.transpile([schema])
+const protocol = {
+  ...generatedSchema,
+  packet_hello: ['protobuf_message', {
+    lengthType: 'varint',
+    type: 'chat_ChatMessage'
+  }]
+}
+
+// 3. Compile and use
+const compiler = new ProtoDefCompiler()
+pp.addTypesToCompiler(compiler)
+compiler.addTypesToCompile(protocol)
+const proto = compiler.compileProtoDefSync()
+
+// 4. Encode/decode messages
+const data = { user_id: 'user123', content: 'Hello, world!' }
+const encoded = proto.createPacketBuffer('packet_hello', data)
+const decoded = proto.parsePacketBuffer('packet_hello', encoded)
 ```
 
-### 2. Define Your Protocol and Compile
+## How It Works
 
-Create your main protocol definition. Typically, you'll wrap your Protobuf message in the `protobuf_message` container to handle framing (as Protocol Buffer messages do not have a length prefix by themselves):
+This library consists of two main components:
+
+1. **Transpiler**: Converts your `.proto` schemas into ProtoDef-compatible JSON
+2. **Runtime Types**: Custom ProtoDef types that handle Protobuf wire format encoding/decoding
+
+### Detailed Usage
+
+#### 1. Transpile Your Schema
+
+Parse your `.proto` file(s) and transpile them into ProtoDef format:
 
 ```js
-const assert = require('assert')
+const { ProtoDefCompiler } = require('protodef').Compiler
+const pp = require('protodef-protobuf')
 
+// Single schema
+const schema = `
+  syntax = "proto3";
+  package chat;
+  message ChatMessage {
+    string user_id = 1;
+    string content = 2;
+  }
+`
+
+// Multiple schemas (useful for extensions)
+const baseSchema = `
+  syntax = "proto2";
+  package game;
+  message Player {
+    extensions 100 to 199;
+    required int32 id = 1;
+  }
+`
+const extensionSchema = `
+  syntax = "proto2";  
+  package game;
+  extend Player {
+    optional string name = 100;
+  }
+`
+
+// Transpile - automatically merges multiple schemas
+const generatedSchema = pp.transpile([schema])
+// or: pp.transpile([baseSchema, extensionSchema])
+```
+
+#### 2. Define Your Protocol and Compile
+
+Create your protocol definition and compile it:
+
+```js
 const protocol = {
   ...generatedSchema, // Include the generated schema
+  
+  // Wrap Protobuf messages with length framing
   packet_hello: ['protobuf_message', {
-    lengthType: 'varint',           // The message is prefixed with a varint length
-    type: 'chat_ChatMessage'        // The payload is our Protobuf message
+    lengthType: 'varint',        // Length prefix type
+    type: 'chat_ChatMessage'     // Your Protobuf message type
   }]
 }
 
 // Create and configure the compiler
 const compiler = new ProtoDefCompiler()
-pp.addTypesToCompiler(compiler) // Add our custom types
-compiler.addTypesToCompile(protocol) // Add the generated schema
+pp.addTypesToCompiler(compiler)    // Add Protobuf runtime types
+compiler.addTypesToCompile(protocol)
 const proto = compiler.compileProtoDefSync()
 
-const helloPacket = {
-  user_id: 'user123',
-  content: 'Hello, world!'
-}
-
-const encoded = proto.createPacketBuffer('packet_hello', helloPacket)
-console.log('Encoded Buffer:', encoded)
-
+// Now you can encode/decode messages!
+const data = { user_id: 'user123', content: 'Hello, world!' }
+const encoded = proto.createPacketBuffer('packet_hello', data)
 const decoded = proto.parsePacketBuffer('packet_hello', encoded)
-assert.deepStrictEqual(decoded.data, helloPacket)
 ```
 
-## API
+## Examples
 
-For a detailed breakdown of the transpiler functions and custom protodef types, see [API.md](./API.md).
+- **[Basic Usage](examples/basic.js)** - Simple Proto3 message
+- **[Proto2 Extensions](examples/extensions.js)** - Working with extensions
+- **[Advanced Features](examples/advanced.js)** - Nested messages, enums, maps
+- **[Multiple Messages](examples/multiple-messages.js)** - Complete protocol example
+
+## API Reference
+
+See **[API.md](docs/API.md)** for detailed documentation of all functions and types.
+
+## Supported Features
+
+| Feature | Proto2 | Proto3 | Notes |
+|---------|--------|--------|-------|
+| Basic Types | ✅ | ✅ | `int32`, `string`, `bool`, etc. |
+| Messages | ✅ | ✅ | Nested messages supported |
+| Enums | ✅ | ✅ | Named values |
+| Repeated Fields | ✅ | ✅ | Including packed encoding |
+| Maps | ✅ | ✅ | `map<key, value>` syntax |
+| Extensions | ✅ | N/A | Not available in Proto3 spec |
+| Oneof | ✅ | ✅ | Wire format only* |
+
+*Oneof constraint validation is not enforced - treat as user validation.
 
 ## Limitations
 
 - **oneof Validation:** The library correctly parses the wire format for `oneof` fields. However, it does not enforce the "only one can be set" constraint on the resulting JavaScript object. This is treated as user-level validation.
+
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
