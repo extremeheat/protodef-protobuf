@@ -1,4 +1,5 @@
 // TODO: Monkey patch: Wait for this to be merged upstream
+// https://github.com/ProtoDef-io/node-protodef/pull/169
 const { ProtoDefCompiler } = require('protodef/src/compiler')
 const original = ProtoDefCompiler.prototype.compileProtoDefSync
 ProtoDefCompiler.prototype.compileProtoDefSync = function () {
