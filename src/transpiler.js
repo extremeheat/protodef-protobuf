@@ -3,6 +3,7 @@
 
 const WIRE_TYPES = {
   varint: 0,
+  varint64: 0, // Add varint64
   zigzag32: 0,
   zigzag64: 0,
   li64: 1,
@@ -18,8 +19,9 @@ const WIRE_TYPES = {
 const PROTO_TO_PROTODEF_TYPE_MAP = {
   int32: 'varint',
   uint32: 'varint',
-  int64: 'varint',
-  uint64: 'varint',
+  // FIX: Map 64-bit integers to the correct varint64 type
+  int64: 'varint64',
+  uint64: 'varint64',
   bool: 'bool',
   enum: 'varint',
   // ZigZag VarInt
@@ -108,7 +110,6 @@ function transpileProtobufAST (ast) {
   const packagePrefix = ast.package ? ast.package.replace(/\./g, '_') + '_' : ''
   processNode(ast, packagePrefix, protodefSchema, ast)
 
-  // After processing all base messages, process the extensions
   if (ast.extends) {
     for (const extension of ast.extends) {
       const targetTypeName = `${packagePrefix}${extension.name}`
@@ -118,9 +119,8 @@ function transpileProtobufAST (ast) {
         continue
       }
       const baseMessageNode = ast.messages.find(m => m.name === extension.name)
-      // FIX: The parser places extension fields in 'extension.message.fields'
       const extensionFields = processFields(extension.message.fields, baseMessageNode, packagePrefix, ast, protodefSchema)
-      targetSchema[1].push(...extensionFields) // Push new fields into the container's field array
+      targetSchema[1].push(...extensionFields)
     }
   }
 

@@ -196,7 +196,7 @@ describe('protodef-protobuf', () => {
       const helloPacket = {
         user_id: 'user123',
         content: 'Hello, world!',
-        timestamp: 1234567890,
+        timestamp: BigInt(1234567890),
         tags: ['greeting', 'test']
       }
 

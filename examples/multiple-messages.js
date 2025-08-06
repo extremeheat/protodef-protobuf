@@ -111,7 +111,7 @@ console.log('✓ LoginResponse:', loginResp)
 const chatMsg = {
   sender: 'testuser',
   content: 'Hello everyone!',
-  timestamp: Date.now(),
+  timestamp: BigInt(Date.now()),
   channel: 'general'
 }
 
@@ -125,7 +125,7 @@ const playerUpd = {
   player_id: 'testuser',
   x: 100.5,
   y: 64.0,
-  z: -23.7,
+  z: -23.5,
   health: 85
 }
 

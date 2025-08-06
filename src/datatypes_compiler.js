@@ -6,6 +6,7 @@ const WIRE_TYPES = {
   varint: 0,
   zigzag32: 0,
   zigzag64: 0,
+  varint64: 0,
   bool: 0,
   li64: 1,
   lu64: 1,
