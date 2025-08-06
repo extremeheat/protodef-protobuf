@@ -1,3 +1,12 @@
+// TODO: Monkey patch: Wait for this to be merged upstream
+const { CompiledProtodef } = require('protodef/src/compiler')
+CompiledProtodef.prototype.constructor = function (sizeOfCtx, writeCtx, readCtx) {
+  this.sizeOfCtx = sizeOfCtx
+  this.writeCtx = writeCtx
+  this.readCtx = readCtx
+  this.setVariable('sizeOfCtx', sizeOfCtx)
+}
+
 const schemaParser = require('protocol-buffers-schema')
 const { transpileProtobufAST, mergeAsts } = require('./transpiler.js')
 const compilerTypes = require('./datatypes/compiler.js')
