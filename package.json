@@ -1,7 +1,7 @@
 {
-  "name": "prismarine-template",
-  "version": "1.0.0",
-  "description": "A template repository to make it easy to create new prismarine repo",
+  "name": "protodef-protobuf",
+  "version": "0.0.1",
+  "description": "A transpiler and runtime for using Google Protocol Buffers (`.proto` files) with ProtoDef",
   "main": "src/index.js",
   "scripts": {
     "test": "mocha --reporter spec --exit",
@@ -11,18 +11,22 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/extremeheat/prismarine-template.git"
+    "url": "git+https://github.com/extremeheat/protodef-protobuf.git"
   },
   "keywords": [],
   "author": "extremeheat",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/extremeheat/prismarine-template/issues"
+    "url": "https://github.com/extremeheat/protodef-protobuf/issues"
   },
-  "homepage": "https://github.com/extremeheat/prismarine-template#readme",
+  "homepage": "https://github.com/extremeheat/protodef-protobuf#readme",
   "devDependencies": {
-    "prismarine-template": "file:.",
-    "standard": "^17.0.0",
-    "mocha": "^11.1.0"
+    "mocha": "^11.1.0",
+    "protodef-protobuf": "file:.",
+    "standard": "^17.0.0"
+  },
+  "dependencies": {
+    "protocol-buffers-schema": "^3.6.0",
+    "protodef": "^1.19.0"
   }
 }
