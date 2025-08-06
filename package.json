@@ -1,6 +1,6 @@
 {
   "name": "protodef-protobuf",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A transpiler and runtime for using Google Protocol Buffers (`.proto` files) with ProtoDef",
   "main": "src/index.js",
   "scripts": {
