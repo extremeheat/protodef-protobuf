@@ -2,23 +2,26 @@ const http2 = require('http2')
 const fs = require('fs')
 const path = require('path')
 const { ProtoDefCompiler } = require('protodef').Compiler
-const pp = require('../../src/index.js')
+const pp = require('protodef-protobuf')
 
 // Load and transpile the .proto schema
 const protoContent = fs.readFileSync(path.join(__dirname, 'service.proto'), 'utf8')
 const generatedSchema = pp.transpile([protoContent])
 
-// Create protocol with gRPC-style message framing
+// Create protocol with gRPC framing using standard container
 const protocol = {
   ...generatedSchema,
-  grpc_request: ['protobuf_message', {
-    lengthType: 'varint',
-    type: 'greeting_HelloRequest'
-  }],
-  grpc_response: ['protobuf_message', {
-    lengthType: 'varint',
-    type: 'greeting_HelloReply'
-  }]
+  // Simplified gRPC frame using manual length handling
+  grpc_request: ['container', [
+    { name: 'compressed', type: 'u8' },
+    { name: 'length', type: 'u32' },
+    { name: 'data', type: ['buffer', { count: 'length' }] }
+  ]],
+  grpc_response: ['container', [
+    { name: 'compressed', type: 'u8' },
+    { name: 'length', type: 'u32' },
+    { name: 'data', type: ['buffer', { count: 'length' }] }
+  ]]
 }
 
 console.log('📋 Generated schema types:', Object.keys(generatedSchema))
@@ -46,14 +49,17 @@ class SimpleGrpcClient {
 
       console.log(`📤 Calling ${path} with:`, request)
 
-      // Serialize request using protobuf_message wrapper
-      const requestBuffer = proto.createPacketBuffer('grpc_request', request)
+      // Serialize the protobuf request first
+      const requestMessageBuffer = proto.createPacketBuffer('greeting_HelloRequest', request)
 
-      // Create simple gRPC frame (compression flag + length + data)
-      const grpcFrame = Buffer.alloc(5 + requestBuffer.length)
-      grpcFrame.writeUInt8(0, 0) // Not compressed
-      grpcFrame.writeUInt32BE(requestBuffer.length, 1) // Length
-      requestBuffer.copy(grpcFrame, 5) // Data
+      // Create gRPC frame using container
+      const grpcRequest = {
+        compressed: 0,
+        length: requestMessageBuffer.length,
+        data: requestMessageBuffer
+      }
+
+      const requestBuffer = proto.createPacketBuffer('grpc_request', grpcRequest)
 
       // Create HTTP/2 stream
       const stream = this.client.request({
@@ -83,18 +89,15 @@ class SimpleGrpcClient {
             return
           }
 
-          // Parse gRPC frame and extract protobuf data
-          const compressed = responseBuffer.readUInt8(0)
-          const length = responseBuffer.readUInt32BE(1)
-          const data = responseBuffer.slice(5, 5 + length)
+          // Parse gRPC response using container
+          const grpcResponse = proto.parsePacketBuffer('grpc_response', responseBuffer)
+          console.log(`📦 Received gRPC frame: compressed=${grpcResponse.data.compressed}, length=${grpcResponse.data.length}`)
 
-          console.log(`📦 Received gRPC frame: compressed=${compressed}, length=${length}`)
+          // Parse the inner protobuf message
+          const innerMessage = proto.parsePacketBuffer('greeting_HelloReply', grpcResponse.data.data)
+          console.log('✅ Response:', innerMessage.data)
 
-          // Deserialize response using protobuf_message wrapper
-          const response = proto.parsePacketBuffer('grpc_response', data)
-          console.log('✅ Response:', response.data)
-
-          resolve(response.data)
+          resolve(innerMessage.data)
         } catch (error) {
           reject(error)
         }
@@ -105,7 +108,7 @@ class SimpleGrpcClient {
       })
 
       // Send request
-      stream.write(grpcFrame)
+      stream.write(requestBuffer)
       stream.end()
     })
   }

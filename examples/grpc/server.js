@@ -2,24 +2,26 @@ const http2 = require('http2')
 const fs = require('fs')
 const path = require('path')
 const { ProtoDefCompiler } = require('protodef').Compiler
-const pp = require('../../src/index.js')
+const pp = require('protodef-protobuf')
 
 // Load and transpile the .proto schema
 const protoContent = fs.readFileSync(path.join(__dirname, 'service.proto'), 'utf8')
 const generatedSchema = pp.transpile([protoContent])
 
-// Create protocol with gRPC-style message framing
+// Create protocol with gRPC framing using standard container
 const protocol = {
   ...generatedSchema,
-  // Use varint length instead of u32be for now
-  grpc_request: ['protobuf_message', {
-    lengthType: 'varint',
-    type: 'greeting_HelloRequest'
-  }],
-  grpc_response: ['protobuf_message', {
-    lengthType: 'varint',
-    type: 'greeting_HelloReply'
-  }]
+  // Simplified gRPC frame using manual length handling
+  grpc_request: ['container', [
+    { name: 'compressed', type: 'u8' },
+    { name: 'length', type: 'u32' },
+    { name: 'data', type: ['buffer', { count: 'length' }] }
+  ]],
+  grpc_response: ['container', [
+    { name: 'compressed', type: 'u8' },
+    { name: 'length', type: 'u32' },
+    { name: 'data', type: ['buffer', { count: 'length' }] }
+  ]]
 }
 
 console.log('📋 Generated schema types:', Object.keys(generatedSchema))
@@ -71,37 +73,38 @@ class SimpleGrpcServer {
 
     stream.on('end', async () => {
       try {
-        // For this demo, let's use a simpler approach
-        // Skip the gRPC framing and just parse the protobuf data directly
         const requestBuffer = Buffer.concat(chunks)
 
         if (requestBuffer.length < 5) {
           throw new Error('Invalid gRPC frame')
         }
 
-        // Skip gRPC framing for now and just use the protobuf_message wrapper
-        // In a real implementation, we'd properly parse the gRPC wire format
-        const data = requestBuffer.slice(5) // Skip gRPC frame header
+        // Parse gRPC frame using ProtoDef container
+        const grpcRequest = proto.parsePacketBuffer('grpc_request', requestBuffer)
+        console.log(`📦 Received gRPC frame: compressed=${grpcRequest.data.compressed}, length=${grpcRequest.data.length}`)
 
-        // Deserialize the protobuf message directly
-        const request = proto.parsePacketBuffer('grpc_request', data)
-        console.log('👋 SayHello called with:', request.data)
+        // Parse the inner protobuf message
+        const innerMessage = proto.parsePacketBuffer('greeting_HelloRequest', grpcRequest.data.data)
+        console.log('👋 SayHello called with:', innerMessage.data)
 
         // Create response
         const reply = {
-          message: `Hello ${request.data.name}! You are ${request.data.age} years old.`,
+          message: `Hello ${innerMessage.data.name}! You are ${innerMessage.data.age} years old.`,
           timestamp: BigInt(Date.now()),
           success: true
         }
 
-        // Serialize response
-        const responseBuffer = proto.createPacketBuffer('grpc_response', reply)
+        // Serialize the response message
+        const replyBuffer = proto.createPacketBuffer('greeting_HelloReply', reply)
 
-        // Create simple gRPC frame (compression flag + length + data)
-        const grpcResponseBuffer = Buffer.alloc(5 + responseBuffer.length)
-        grpcResponseBuffer.writeUInt8(0, 0) // Not compressed
-        grpcResponseBuffer.writeUInt32BE(responseBuffer.length, 1) // Length
-        responseBuffer.copy(grpcResponseBuffer, 5) // Data
+        // Create gRPC response frame
+        const grpcResponse = {
+          compressed: 0,
+          length: replyBuffer.length,
+          data: replyBuffer
+        }
+
+        const responseBuffer = proto.createPacketBuffer('grpc_response', grpcResponse)
 
         // Send gRPC response
         stream.respond({
@@ -110,10 +113,10 @@ class SimpleGrpcServer {
           'grpc-status': '0'
         })
 
-        stream.write(grpcResponseBuffer)
+        stream.write(responseBuffer)
         stream.end()
 
-        console.log(`✅ Response sent (${grpcResponseBuffer.length} bytes)`)
+        console.log(`✅ Response sent (${responseBuffer.length} bytes)`)
       } catch (error) {
         console.error('❌ Error handling request:', error.message)
         stream.respond({

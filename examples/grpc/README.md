@@ -47,7 +47,7 @@ content-type: application/grpc
 grpc-status: 0 (0=OK, others=error codes)
 ```
 
-That's it! The complex part (Protocol Buffer serialization) is handled by `protodef-protobuf`.
+That's it! The complex part (Protocol Buffer serialization) is handled by `protodef-protobuf` and the framing can be easily managed with existing ProtoDef types.
 
 ## Files in This Example
 
