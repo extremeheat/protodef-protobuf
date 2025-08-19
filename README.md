@@ -73,65 +73,7 @@ The library supports both **compiler mode** (for performance) and **interpreter 
 
 #### 1. Transpile Your Schema
 
-**Simple schemas (no imports)**
-```js
-const pp = require('protodef-protobuf')
-
-const schema = `
-  syntax = "proto3";
-  package chat;
-  message ChatMessage {
-    string user_id = 1;
-    string content = 2;
-  }
-`
-
-const generatedSchema = pp.transpile([schema])
-```
-
-**Schemas with Google well-known types**
-```js
-// Google types are handled automatically!
-const schemaWithGoogle = `
-  syntax = "proto3";
-  import "google/protobuf/timestamp.proto";
-  message User {
-    string name = 1;
-    google.protobuf.Timestamp created_at = 2;
-  }
-`
-
-// No special handling needed - Google imports work automatically
-const schema = pp.transpile([schemaWithGoogle])  // ✅ Just works!
-```
-
-**Schemas with external imports**
-```js
-const fs = require('fs')
-
-// Option A: Manual approach (most reliable)
-const baseSchema = fs.readFileSync('common.proto', 'utf8')
-const userSchema = fs.readFileSync('user.proto', 'utf8') 
-const schema = pp.transpile([baseSchema, userSchema], { 
-  allowImports: true  // Allow import statements
-})
-
-// Option B: File-based resolution
-const schema = pp.transpileFromFiles(['user.proto'], {
-  baseDir: './protos'
-})
-```
-
-**Error handling**
-```js
-try {
-  // This throws a helpful error for unresolved external imports
-  const schema = pp.transpile([schemaWithExternalImports])
-} catch (error) {
-  // Provides clear guidance on how to resolve imports
-  console.log(error.message)
-}
-```
+Parse your `.proto` file(s) and transpile them into ProtoDef format:
 
 ```js
 const { ProtoDefCompiler } = require('protodef').Compiler
@@ -208,7 +150,7 @@ const decoded = proto.parsePacketBuffer('packet_hello', encoded)
 - **[Message Bytes](examples/message-bytes.js)** - Handling binary data
 
 **Import Handling**
-- **[Google Imports](examples/google-imports.js)** - Using Google well-known types (automatic)
+- **[Google Imports](examples/google-imports.js)** - Using Google well-known types (built-in)
 - **[File System Imports](examples/fs-imports/)** - Importing custom .proto files from disk
 
 **Advanced**
@@ -228,6 +170,7 @@ See **[API.md](docs/API.md)** for detailed documentation of all functions and ty
 | Repeated Fields | ✅ | ✅ | Including packed encoding |
 | Maps | ✅ | ✅ | `map<key, value>` syntax |
 | Extensions | ✅ | N/A | Not available in Proto3 spec |
+| Imports | ✅ | ✅ | Supports `import` statements |
 | Oneof | ✅ | ✅ | Wire format only* |
 
 *Oneof constraint validation is not enforced - treat as user validation.

@@ -485,8 +485,18 @@ const protocol = {
 
 ## Examples
 
-- **[Basic Usage](../examples/basic.js)** - Simple Proto3 message encoding/decoding
-- **[Interpreter Mode](../examples/interpreter.js)** - Using ProtoDef interpreter for runtime flexibility
-- **[Proto2 Extensions](../examples/extensions.js)** - Working with Proto2 extensions  
-- **[Advanced Features](../examples/advanced.js)** - Nested messages, enums, maps
-- **[Multiple Messages](../examples/multiple-messages.js)** - Complete protocol with multiple message types
+**Getting Started**
+- **[Basic Compiler](../examples/basic-compiler.js)** - Simple Proto3 message with compiler
+- **[Basic Interpreter](../examples/basic-interpreter.js)** - Same example using interpreter mode
+
+**Core Features** 
+- **[Extensions](../examples/extensions.js)** - Working with Proto2 extensions
+- **[Multiple Messages](../examples/multiple-messages.js)** - Complete protocol example
+- **[Message Bytes](../examples/message-bytes.js)** - Handling binary data
+
+**Import Handling**
+- **[Google Imports](../examples/google-imports.js)** - Using Google well-known types (built-in)
+- **[File System Imports](../examples/fs-imports/)** - Importing custom .proto files from disk
+
+**Advanced**
+- **[gRPC Example](../examples/grpc/)** - Using with gRPC-style schemas
