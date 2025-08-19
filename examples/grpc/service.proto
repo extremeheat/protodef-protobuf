@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package greeting;
+
+message HelloRequest {
+  string name = 1;
+  int32 age = 2;
+}
+
+message HelloReply {
+  string message = 1;
+  int64 timestamp = 2;
+  bool success = 3;
+}
+
+message StreamRequest {
+  string query = 1;
+  int32 count = 2;
+}
+
+message StreamReply {
+  string data = 1;
+  int32 sequence = 2;
+  bool is_final = 3;
+}
+
+// This is what a gRPC service definition would look like
+// (though our transpiler will ignore this part)
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloReply);
+  rpc SayHelloStream (HelloRequest) returns (stream StreamReply);
+}
