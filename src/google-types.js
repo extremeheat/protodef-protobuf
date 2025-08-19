@@ -195,5 +195,5 @@ const GOOGLE_WELL_KNOWN_TYPES = {
 }
 
 module.exports = {
-  GOOGLE_WELL_KNOWN_TYPES
+  googleTypes: GOOGLE_WELL_KNOWN_TYPES
 }

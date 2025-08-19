@@ -12,6 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const schemaParser = require('protocol-buffers-schema')
 const { transpileProtobufAST, mergeAsts } = require('./transpiler.js')
+const { googleTypes } = require('./google-types.js')
 const importHelpers = require('./imports.js')
 const compilerTypes = require('./datatypes/compiler.js')
 const interpreterTypes = require('./datatypes/interpreter.js')
@@ -28,21 +29,19 @@ function transpile (schemas, options = {}) {
 
   const asts = schemas.map(s => schemaParser.parse(s))
 
-  // Check for imports and handle them appropriately
   if (!allowImports) {
     const imports = importHelpers.findImports(asts)
     if (imports.length > 0) {
-      // Check if all imports are Google well-known types
-      const { GOOGLE_WELL_KNOWN_TYPES } = require('./google-types.js')
-      const googleImports = imports.filter(imp => GOOGLE_WELL_KNOWN_TYPES[imp])
-      const externalImports = imports.filter(imp => !GOOGLE_WELL_KNOWN_TYPES[imp])
+      // If all imports are Google well-known types, we can handle it here.
+      const googleImports = imports.filter(imp => googleTypes[imp])
+      const externalImports = imports.filter(imp => !googleTypes[imp])
 
       if (externalImports.length > 0) {
         // There are external imports - throw error
         throw importHelpers.createImportError(imports)
       } else {
-        // Only Google imports - automatically resolve them
-        const googleSchemas = googleImports.map(imp => GOOGLE_WELL_KNOWN_TYPES[imp].trim())
+        // Only built-in Google imports - automatically resolve them
+        const googleSchemas = googleImports.map(imp => googleTypes[imp].trim())
         schemas = [...googleSchemas, ...schemas]
       }
     }
@@ -54,9 +53,6 @@ function transpile (schemas, options = {}) {
 
 /**
  * Transpile .proto files from the filesystem with automatic import resolution.
- *
- * ⚠️  CURRENT LIMITATIONS:
- * - Works best with Google well-known types (google/protobuf/*)
  * - Cross-package type references may have issues in complex scenarios
  * - For complex imports, use the manual transpile() approach with allowImports: true
  *
