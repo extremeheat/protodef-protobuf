@@ -36,7 +36,7 @@ function transpile (schemas, options = {}) {
       const { GOOGLE_WELL_KNOWN_TYPES } = require('./google-types.js')
       const googleImports = imports.filter(imp => GOOGLE_WELL_KNOWN_TYPES[imp])
       const externalImports = imports.filter(imp => !GOOGLE_WELL_KNOWN_TYPES[imp])
-      
+
       if (externalImports.length > 0) {
         // There are external imports - throw error
         throw importHelpers.createImportError(imports)

@@ -198,13 +198,20 @@ const decoded = proto.parsePacketBuffer('packet_hello', encoded)
 
 ## Examples
 
-- **[Basic Usage](examples/basic.js)** - Simple Proto3 message
-- **[Interpreter Mode](examples/interpreter.js)** - Using runtime flexibility  
-- **[Proto2 Extensions](examples/extensions.js)** - Working with extensions
-- **[Advanced Features](examples/advanced.js)** - Nested messages, enums, maps
+**Getting Started**
+- **[Basic Compiler](examples/basic-compiler.js)** - Simple Proto3 message with compiler
+- **[Basic Interpreter](examples/basic-interpreter.js)** - Same example using interpreter mode
+
+**Core Features** 
+- **[Extensions](examples/extensions.js)** - Working with Proto2 extensions
 - **[Multiple Messages](examples/multiple-messages.js)** - Complete protocol example
-- **[Google Imports](examples/imports/google.js)** - Using Google well-known types
-- **[External Imports](examples/imports/external.js)** - Importing custom .proto files  
+- **[Message Bytes](examples/message-bytes.js)** - Handling binary data
+
+**Import Handling**
+- **[Google Imports](examples/google-imports.js)** - Using Google well-known types (automatic)
+- **[File System Imports](examples/fs-imports/)** - Importing custom .proto files from disk
+
+**Advanced**
 - **[gRPC Example](examples/grpc/)** - Using with gRPC-style schemas
 
 ## API Reference

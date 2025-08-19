@@ -1,0 +1,13 @@
+syntax = "proto3";
+package common;
+
+message Address {
+  string street = 1;
+  string city = 2;
+  string country = 3;
+}
+
+message Contact {
+  string email = 1;
+  string phone = 2;
+}

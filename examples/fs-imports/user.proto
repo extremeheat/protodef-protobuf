@@ -1,0 +1,11 @@
+syntax = "proto3";
+package user;
+
+import "common.proto";
+
+message User {
+  string id = 1;
+  string name = 2;
+  common.Address address = 3;
+  common.Contact contact = 4;
+}

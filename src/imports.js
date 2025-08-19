@@ -88,7 +88,6 @@ function resolveImports (importPaths, options = {}) {
  */
 function createImportError (imports) {
   const googleImports = imports.filter(imp => imp.startsWith('google/protobuf/'))
-  const otherImports = imports.filter(imp => !imp.startsWith('google/protobuf/'))
 
   let message = 'Found import statements but import resolution is disabled.\n\n'
   message += 'Imports found:\n'
