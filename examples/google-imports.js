@@ -1,10 +1,8 @@
-const assert = require('assert');
-const { ProtoDefCompiler } = require('protodef').Compiler;
 const pp = require('protodef-protobuf');
 
-console.log('=== Google Well-Known Types Example ===\n');
+console.log('=== Google Imports Example ===\n');
 
-// A simple schema that uses common Google types
+// A simple schema that uses common Google types, which work without external imports!
 const userSchema = `
 syntax = "proto3";
 package user;
