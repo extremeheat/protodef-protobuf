@@ -1,0 +1,12 @@
+
+syntax = "proto3";
+package example;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+message SimpleMessage {
+  string name = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Empty empty_field = 3;
+}

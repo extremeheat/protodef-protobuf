@@ -14,6 +14,7 @@ This allows you to read/write Protocol Buffer-encoded messages in your ProtoDef 
 - **High Performance:** Generates optimized JavaScript functions using protodef's AOT (Ahead-Of-Time) compiler.
 - **Runtime Flexibility:** Supports ProtoDef's interpreter mode on top of compiler for dynamic schemas.
 - **Flexible Framing:** Includes a `protobuf_message` container for easily length-prefixing your Protobuf messages, making them embeddable in any protocol.
+- **Import Support:** Handles `.proto` file imports including Google well-known types with automatic error detection.
 
 ## Installation
 
@@ -72,7 +73,47 @@ The library supports both **compiler mode** (for performance) and **interpreter 
 
 #### 1. Transpile Your Schema
 
-Parse your `.proto` file(s) and transpile them into ProtoDef format:
+You have several options for handling Protocol Buffer schemas with imports:
+
+**Option A: Automatic Import Resolution (Best for Google Types)**
+```js
+const pp = require('protodef-protobuf')
+
+// Works great with Google well-known types
+const schema = pp.transpileFromFiles(['user.proto'], {
+  baseDir: './protos',
+  resolveImports: true,  // Automatically resolve imports
+  includeGoogleTypes: true  // Include common Google types
+})
+```
+
+**Option B: Manual Schema Management (Most Reliable)**
+```js
+const fs = require('fs')
+const pp = require('protodef-protobuf')
+
+// Load all schemas manually - most reliable approach
+const baseSchema = fs.readFileSync('base.proto', 'utf8')
+const userSchema = fs.readFileSync('user.proto', 'utf8') 
+
+// For Google types, you can use the included ones
+const timestampSchema = pp.googleTypes.GOOGLE_WELL_KNOWN_TYPES['google/protobuf/timestamp.proto']
+
+const schemas = pp.transpile([baseSchema, userSchema, timestampSchema], { 
+  allowImports: true  // Allow import statements without resolution
+})
+```
+
+**Error Handling for Imports**
+```js
+try {
+  // This will throw an error if imports are detected but not handled
+  const schema = pp.transpile([schemaWithImports])  // ❌ Error!
+} catch (error) {
+  // Error provides helpful suggestions for resolving imports
+  console.log(error.message)
+}
+```
 
 ```js
 const { ProtoDefCompiler } = require('protodef').Compiler
@@ -144,6 +185,9 @@ const decoded = proto.parsePacketBuffer('packet_hello', encoded)
 - **[Proto2 Extensions](examples/extensions.js)** - Working with extensions
 - **[Advanced Features](examples/advanced.js)** - Nested messages, enums, maps
 - **[Multiple Messages](examples/multiple-messages.js)** - Complete protocol example
+- **[Import Resolution](examples/imports-simple.js)** - Working with imports and Google types
+- **[Google Types Usage](examples/google-types.js)** - Different approaches for Google well-known types
+- **[gRPC Example](examples/grpc/)** - Using with gRPC-style schemas
 
 ## API Reference
 
