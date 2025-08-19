@@ -1,6 +1,6 @@
 // Example demonstrating protobuf bytes field handling
 const { ProtoDef } = require('protodef')
-const pp = require('../src/index.js')
+const pp = require('protodef-protobuf')
 
 // Schema with bytes fields
 const schema = `

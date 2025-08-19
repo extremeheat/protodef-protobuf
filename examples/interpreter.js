@@ -10,7 +10,7 @@
  */
 
 const { ProtoDef } = require('protodef')
-const pp = require('../src/index.js')
+const pp = require('protodef-protobuf')
 
 // Define a simple protobuf schema
 const schema = `
