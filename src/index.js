@@ -20,7 +20,7 @@ const interpreterTypes = require('./datatypes/interpreter.js')
  * A higher-level wrapper that parses and transpiles an array of .proto schema strings.
  * @param {string[]} schemas - An array of strings, where each string is the content of a .proto file.
  * @param {object} options - Options for transpilation
- * @param {boolean} options.allowImports - If false (default), throw error when imports are detected
+ * @param {boolean} options.allowImports - If false (default), handle Google imports automatically but error on external imports
  * @returns {object} The protodef JSON schema.
  */
 function transpile (schemas, options = {}) {
@@ -32,11 +32,23 @@ function transpile (schemas, options = {}) {
   if (!allowImports) {
     const imports = importHelpers.findImports(asts)
     if (imports.length > 0) {
-      throw importHelpers.createImportError(imports)
+      // Check if all imports are Google well-known types
+      const { GOOGLE_WELL_KNOWN_TYPES } = require('./google-types.js')
+      const googleImports = imports.filter(imp => GOOGLE_WELL_KNOWN_TYPES[imp])
+      const externalImports = imports.filter(imp => !GOOGLE_WELL_KNOWN_TYPES[imp])
+      
+      if (externalImports.length > 0) {
+        // There are external imports - throw error
+        throw importHelpers.createImportError(imports)
+      } else {
+        // Only Google imports - automatically resolve them
+        const googleSchemas = googleImports.map(imp => GOOGLE_WELL_KNOWN_TYPES[imp].trim())
+        schemas = [...googleSchemas, ...schemas]
+      }
     }
   }
 
-  const mergedAst = mergeAsts(asts)
+  const mergedAst = mergeAsts(schemas.map(s => schemaParser.parse(s)))
   return transpileProtobufAST(mergedAst)
 }
 

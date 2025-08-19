@@ -73,44 +73,62 @@ The library supports both **compiler mode** (for performance) and **interpreter 
 
 #### 1. Transpile Your Schema
 
-You have several options for handling Protocol Buffer schemas with imports:
-
-**Option A: Automatic Import Resolution (Best for Google Types)**
+**Simple schemas (no imports)**
 ```js
 const pp = require('protodef-protobuf')
 
-// Works great with Google well-known types
-const schema = pp.transpileFromFiles(['user.proto'], {
-  baseDir: './protos',
-  resolveImports: true,  // Automatically resolve imports
-  includeGoogleTypes: true  // Include common Google types
-})
+const schema = `
+  syntax = "proto3";
+  package chat;
+  message ChatMessage {
+    string user_id = 1;
+    string content = 2;
+  }
+`
+
+const generatedSchema = pp.transpile([schema])
 ```
 
-**Option B: Manual Schema Management (Most Reliable)**
+**Schemas with Google well-known types**
+```js
+// Google types are handled automatically!
+const schemaWithGoogle = `
+  syntax = "proto3";
+  import "google/protobuf/timestamp.proto";
+  message User {
+    string name = 1;
+    google.protobuf.Timestamp created_at = 2;
+  }
+`
+
+// No special handling needed - Google imports work automatically
+const schema = pp.transpile([schemaWithGoogle])  // ✅ Just works!
+```
+
+**Schemas with external imports**
 ```js
 const fs = require('fs')
-const pp = require('protodef-protobuf')
 
-// Load all schemas manually - most reliable approach
-const baseSchema = fs.readFileSync('base.proto', 'utf8')
+// Option A: Manual approach (most reliable)
+const baseSchema = fs.readFileSync('common.proto', 'utf8')
 const userSchema = fs.readFileSync('user.proto', 'utf8') 
+const schema = pp.transpile([baseSchema, userSchema], { 
+  allowImports: true  // Allow import statements
+})
 
-// For Google types, you can use the included ones
-const timestampSchema = pp.googleTypes.GOOGLE_WELL_KNOWN_TYPES['google/protobuf/timestamp.proto']
-
-const schemas = pp.transpile([baseSchema, userSchema, timestampSchema], { 
-  allowImports: true  // Allow import statements without resolution
+// Option B: File-based resolution
+const schema = pp.transpileFromFiles(['user.proto'], {
+  baseDir: './protos'
 })
 ```
 
-**Error Handling for Imports**
+**Error handling**
 ```js
 try {
-  // This will throw an error if imports are detected but not handled
-  const schema = pp.transpile([schemaWithImports])  // ❌ Error!
+  // This throws a helpful error for unresolved external imports
+  const schema = pp.transpile([schemaWithExternalImports])
 } catch (error) {
-  // Error provides helpful suggestions for resolving imports
+  // Provides clear guidance on how to resolve imports
   console.log(error.message)
 }
 ```
@@ -185,8 +203,8 @@ const decoded = proto.parsePacketBuffer('packet_hello', encoded)
 - **[Proto2 Extensions](examples/extensions.js)** - Working with extensions
 - **[Advanced Features](examples/advanced.js)** - Nested messages, enums, maps
 - **[Multiple Messages](examples/multiple-messages.js)** - Complete protocol example
-- **[Import Resolution](examples/imports-simple.js)** - Working with imports and Google types
-- **[Google Types Usage](examples/google-types.js)** - Different approaches for Google well-known types
+- **[Google Imports](examples/imports/google.js)** - Using Google well-known types
+- **[External Imports](examples/imports/external.js)** - Importing custom .proto files  
 - **[gRPC Example](examples/grpc/)** - Using with gRPC-style schemas
 
 ## API Reference
