@@ -3,6 +3,7 @@
   "version": "0.0.2",
   "description": "A transpiler and runtime for using Google Protocol Buffers (`.proto` files) with ProtoDef",
   "main": "src/index.js",
+  "types": "index.d.ts",
   "scripts": {
     "test": "mocha --reporter spec --exit",
     "pretest": "npm run lint",

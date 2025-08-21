@@ -23,12 +23,14 @@ These are the primary functions you'll use to integrate Protocol Buffers with Pr
 
 ---
 
-### `transpile(schemas)`
+### `transpile(schemas, options)`
 
 Converts Protocol Buffer `.proto` schemas into ProtoDef-compatible JSON format.
 
 **Parameters:**
 - `schemas` **Array<String>** - Array of `.proto` file contents as strings
+- `options` **Object** (optional) - Transpilation options
+  - `allowImports` **Boolean** - Allow import statements without resolution (default: false)
 
 **Returns:**
 - **Object** - ProtoDef JSON schema containing all message types
@@ -51,6 +53,19 @@ console.log(result)
 // Output: { example_User: ['protobuf_container', [...]] }
 ```
 
+**With Import Handling:**
+```js
+// Allow imports without resolving them (manual approach)
+const result = pp.transpile([schema1, schema2], { allowImports: true })
+
+// This will throw an error if imports are detected
+try {
+  const result = pp.transpile([schemaWithImports])
+} catch (error) {
+  console.log(error.message) // Helpful error with suggestions
+}
+```
+
 **With Multiple Schemas (Extensions):**
 ```js
 const base = `
@@ -70,9 +85,81 @@ const extension = `
   }
 `
 
-const merged = pp.transpile([base, extension])
+const merged = pp.transpile([base, extension], { allowImports: true })
 // Automatically merges the extension into the Player message
 ```
+
+---
+
+### `transpileFromFiles(filePaths, options)`
+
+**⚠️ Beta Feature** - Transpile .proto files from filesystem with automatic import resolution.
+
+Works best with Google well-known types. For complex cross-package imports, use the manual `transpile()` approach.
+
+**Parameters:**
+- `filePaths` **Array<String>** - Array of .proto file paths to load and transpile
+- `options` **Object** (optional) - File loading and import resolution options
+  - `baseDir` **String** - Base directory for resolving paths (default: `process.cwd()`)
+  - `includeDirs` **Array<String>** - Additional search directories (default: `[]`)
+  - `resolveImports` **Boolean** - Automatically resolve imports (default: `true`)
+  - `includeGoogleTypes` **Boolean** - Include Google well-known types (default: `true`)
+
+**Returns:**
+- **Object** - ProtoDef JSON schema containing all message types
+
+**Example:**
+```js
+const pp = require('protodef-protobuf')
+
+// Load and transpile with automatic import resolution
+const schema = pp.transpileFromFiles(['user.proto', 'common.proto'], {
+  baseDir: './protos',
+  resolveImports: true
+})
+
+// Works great with Google types
+const schema2 = pp.transpileFromFiles(['messages.proto'], {
+  baseDir: './schemas',
+  resolveImports: true,
+  includeGoogleTypes: true  // Includes google/protobuf/* types
+})
+```
+
+---
+
+### `googleTypes`
+
+**Separated Google Well-Known Types** - Access to common Google Protocol Buffer types.
+
+Contains pre-defined schema strings for the most commonly used Google protobuf types. These are provided as a convenience but can be replaced with your own versions if needed.
+
+**Available Types:**
+- `google/protobuf/timestamp.proto` - Point in time representation
+- `google/protobuf/duration.proto` - Time span representation  
+- `google/protobuf/any.proto` - Arbitrary message container
+- `google/protobuf/empty.proto` - Empty message placeholder
+- `google/protobuf/wrappers.proto` - Wrapper types for primitives
+- `google/protobuf/struct.proto` - Dynamic JSON-like structures
+- `google/protobuf/field_mask.proto` - Field selection masks
+
+**Usage:**
+```js
+const pp = require('protodef-protobuf')
+
+// List available types
+console.log(Object.keys(pp.googleTypes.GOOGLE_WELL_KNOWN_TYPES))
+
+// Use manually in transpilation
+const timestampSchema = pp.googleTypes.GOOGLE_WELL_KNOWN_TYPES['google/protobuf/timestamp.proto']
+const userSchema = '...' // Your schema that imports timestamp
+
+const result = pp.transpile([timestampSchema, userSchema], { allowImports: true })
+```
+
+**Note:** These definitions may become outdated over time. For the most current versions, consider downloading directly from [Google's protobuf repository](https://github.com/protocolbuffers/protobuf/tree/main/src/google/protobuf).
+
+---
 
 ### `addTypesToCompiler(compiler)`
 
@@ -398,8 +485,18 @@ const protocol = {
 
 ## Examples
 
-- **[Basic Usage](../examples/basic.js)** - Simple Proto3 message encoding/decoding
-- **[Interpreter Mode](../examples/interpreter.js)** - Using ProtoDef interpreter for runtime flexibility
-- **[Proto2 Extensions](../examples/extensions.js)** - Working with Proto2 extensions  
-- **[Advanced Features](../examples/advanced.js)** - Nested messages, enums, maps
-- **[Multiple Messages](../examples/multiple-messages.js)** - Complete protocol with multiple message types
+**Getting Started**
+- **[Basic Compiler](../examples/basic-compiler.js)** - Simple Proto3 message with compiler
+- **[Basic Interpreter](../examples/basic-interpreter.js)** - Same example using interpreter mode
+
+**Core Features** 
+- **[Extensions](../examples/extensions.js)** - Working with Proto2 extensions
+- **[Multiple Messages](../examples/multiple-messages.js)** - Complete protocol example
+- **[Message Bytes](../examples/message-bytes.js)** - Handling binary data
+
+**Import Handling**
+- **[Google Imports](../examples/google-imports.js)** - Using Google well-known types (built-in)
+- **[File System Imports](../examples/fs-imports/)** - Importing custom .proto files from disk
+
+**Advanced**
+- **[gRPC Example](../examples/grpc/)** - Using with gRPC-style schemas
